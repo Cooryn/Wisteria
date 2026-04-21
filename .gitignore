@@ -1,0 +1,16 @@
+node_modules/
+dist/
+coverage/
+.vite/
+.cargo-home/
+.npm-cache/
+rustup-init.exe
+.DS_Store
+Thumbs.db
+src-tauri/target/
+src-tauri/gen/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*

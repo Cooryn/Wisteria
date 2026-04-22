@@ -19,6 +19,13 @@ struct GitCommandOutput {
     stderr: String,
 }
 
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LocalPathInfo {
+    exists: bool,
+    is_dir: bool,
+}
+
 fn is_git_executable(path: &str) -> bool {
     Path::new(path)
         .file_stem()
@@ -62,6 +69,23 @@ fn run_git_command(input: GitCommandInput) -> GitCommandOutput {
             stdout: String::new(),
             stderr: err.to_string(),
         },
+    }
+}
+
+#[tauri::command]
+fn inspect_local_path(path: String) -> LocalPathInfo {
+    let trimmed = path.trim();
+    if trimmed.is_empty() {
+        return LocalPathInfo {
+            exists: false,
+            is_dir: false,
+        };
+    }
+
+    let local_path = Path::new(trimmed);
+    LocalPathInfo {
+        exists: local_path.exists(),
+        is_dir: local_path.is_dir(),
     }
 }
 
@@ -144,10 +168,31 @@ pub fn run() {
             "#,
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 3,
+            description: "add contribution sessions",
+            sql: r#"
+                CREATE TABLE IF NOT EXISTS contribution_sessions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    issue_github_id INTEGER UNIQUE NOT NULL,
+                    repo_full_name TEXT NOT NULL,
+                    local_repo_path TEXT NOT NULL,
+                    fork_full_name TEXT NOT NULL,
+                    push_remote_name TEXT NOT NULL,
+                    base_branch TEXT NOT NULL,
+                    branch_name TEXT NOT NULL,
+                    pr_url TEXT,
+                    status TEXT NOT NULL DEFAULT 'ready',
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                );
+            "#,
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![run_git_command])
+        .invoke_handler(tauri::generate_handler![run_git_command, inspect_local_path])
         .plugin(
             tauri_plugin_sql::Builder::default()
                 .add_migrations("sqlite:wisteria.db", migrations)

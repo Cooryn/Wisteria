@@ -3,6 +3,10 @@ import type { Repo, Issue, GitHubUser } from '../types';
 
 let octokitInstance: Octokit | null = null;
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
 export function initOctokit(token: string): Octokit {
   octokitInstance = new Octokit({ auth: token });
   return octokitInstance;
@@ -214,6 +218,52 @@ export async function forkRepository(
   };
 }
 
+export async function ensureForkExists(
+  owner: string,
+  repo: string
+): Promise<{ owner_login: string; full_name: string; html_url: string }> {
+  const ok = getOctokit();
+  const currentUser = await getAuthenticatedUser();
+
+  try {
+    const { data } = await ok.rest.repos.get({
+      owner: currentUser.login,
+      repo,
+    });
+
+    return {
+      owner_login: currentUser.login,
+      full_name: data.full_name,
+      html_url: data.html_url,
+    };
+  } catch (err) {
+    const status = (err as { status?: number }).status;
+    if (status !== 404) {
+      throw err;
+    }
+  }
+
+  const fork = await forkRepository(owner, repo);
+
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    try {
+      await ok.rest.repos.get({
+        owner: currentUser.login,
+        repo,
+      });
+      break;
+    } catch {
+      await sleep(1500);
+    }
+  }
+
+  return {
+    owner_login: currentUser.login,
+    full_name: fork.full_name,
+    html_url: fork.html_url,
+  };
+}
+
 // ---- Create Draft PR ----
 export async function createDraftPR(params: {
   owner: string;
@@ -236,6 +286,31 @@ export async function createDraftPR(params: {
   return {
     html_url: data.html_url,
     number: data.number,
+  };
+}
+
+export async function findOpenPullRequestByHead(params: {
+  owner: string;
+  repo: string;
+  head: string;
+}): Promise<{ html_url: string; number: number } | null> {
+  const ok = getOctokit();
+  const { data } = await ok.rest.pulls.list({
+    owner: params.owner,
+    repo: params.repo,
+    state: 'open',
+    head: params.head,
+    per_page: 1,
+  });
+
+  const existing = data[0];
+  if (!existing) {
+    return null;
+  }
+
+  return {
+    html_url: existing.html_url,
+    number: existing.number,
   };
 }
 

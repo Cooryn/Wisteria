@@ -1,5 +1,11 @@
 import Database from '@tauri-apps/plugin-sql';
-import type { TechTag, SavedRepo, SavedIssue, PRHistoryEntry } from '../types';
+import type {
+  ContributionSession,
+  PRHistoryEntry,
+  SavedIssue,
+  SavedRepo,
+  TechTag,
+} from '../types';
 
 let db: Database | null = null;
 
@@ -170,6 +176,70 @@ export async function addPRHistory(entry: Omit<PRHistoryEntry, 'id' | 'created_a
      VALUES ($1, $2, $3, $4, $5)`,
     [entry.issue_id, entry.repo_full_name, entry.pr_url, entry.branch_name, entry.status]
   );
+}
+
+// ---- Contribution Sessions ----
+export async function getContributionSessionByIssueGitHubId(
+  issueGitHubId: number
+): Promise<ContributionSession | null> {
+  const d = await getDb();
+  const rows = await d.select<ContributionSession[]>(
+    'SELECT * FROM contribution_sessions WHERE issue_github_id = $1 LIMIT 1',
+    [issueGitHubId]
+  );
+  return rows[0] ?? null;
+}
+
+export async function upsertContributionSession(
+  session: Omit<ContributionSession, 'id' | 'created_at' | 'updated_at'>
+): Promise<void> {
+  const d = await getDb();
+  await d.execute(
+    `INSERT INTO contribution_sessions (
+       issue_github_id, repo_full_name, local_repo_path, fork_full_name,
+       push_remote_name, base_branch, branch_name, pr_url, status
+     )
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+     ON CONFLICT(issue_github_id) DO UPDATE SET
+       repo_full_name = excluded.repo_full_name,
+       local_repo_path = excluded.local_repo_path,
+       fork_full_name = excluded.fork_full_name,
+       push_remote_name = excluded.push_remote_name,
+       base_branch = excluded.base_branch,
+       branch_name = excluded.branch_name,
+       pr_url = excluded.pr_url,
+       status = excluded.status,
+       updated_at = CURRENT_TIMESTAMP`,
+    [
+      session.issue_github_id,
+      session.repo_full_name,
+      session.local_repo_path,
+      session.fork_full_name,
+      session.push_remote_name,
+      session.base_branch,
+      session.branch_name,
+      session.pr_url,
+      session.status,
+    ]
+  );
+}
+
+export async function updateContributionSessionDraftPR(
+  issueGitHubId: number,
+  prUrl: string
+): Promise<void> {
+  const d = await getDb();
+  await d.execute(
+    `UPDATE contribution_sessions
+     SET pr_url = $1, status = 'draft_created', updated_at = CURRENT_TIMESTAMP
+     WHERE issue_github_id = $2`,
+    [prUrl, issueGitHubId]
+  );
+}
+
+export async function deleteContributionSession(issueGitHubId: number): Promise<void> {
+  const d = await getDb();
+  await d.execute('DELETE FROM contribution_sessions WHERE issue_github_id = $1', [issueGitHubId]);
 }
 
 // ---- Preferences (simple key-value) ----

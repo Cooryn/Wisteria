@@ -106,6 +106,23 @@ export interface PRHistoryEntry {
   created_at: string;
 }
 
+export type ContributionSessionStatus = 'ready' | 'draft_created';
+
+export interface ContributionSession {
+  id: number;
+  issue_github_id: number;
+  repo_full_name: string;
+  local_repo_path: string;
+  fork_full_name: string;
+  push_remote_name: string;
+  base_branch: string;
+  branch_name: string;
+  pr_url: string | null;
+  status: ContributionSessionStatus;
+  created_at: string;
+  updated_at: string;
+}
+
 // ---- Scoring ----
 export interface ScoreBreakdown {
   languageMatch: number;
@@ -177,4 +194,23 @@ export interface DraftPRResult {
   success: boolean;
   pr_url?: string;
   error?: string;
+}
+
+export interface ContributionProgressStep {
+  key: string;
+  label: string;
+  detail?: string;
+  status: 'pending' | 'running' | 'success' | 'error';
+}
+
+export interface StartContributionResult {
+  session: ContributionSession;
+  localRepoPath: string;
+  branchName: string;
+}
+
+export interface CreateDraftPRFromSessionResult {
+  session: ContributionSession;
+  prUrl: string;
+  reusedExisting: boolean;
 }

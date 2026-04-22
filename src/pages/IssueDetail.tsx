@@ -1,0 +1,384 @@
+import { useState, useCallback } from 'react';
+import {
+  Box,
+  Typography,
+  Button,
+  Card,
+  CardContent,
+  Chip,
+  Stack,
+  CircularProgress,
+  Divider,
+  IconButton,
+  alpha,
+  Fade,
+} from '@mui/material';
+import {
+  ArrowBack as BackIcon,
+  OpenInNew as OpenIcon,
+  Bookmark as BookmarkIcon,
+  PlayArrow as StartIcon,
+  AutoAwesome as AIIcon,
+  Schedule as TimeIcon,
+  Speed as DifficultyIcon,
+} from '@mui/icons-material';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { useAppStore } from '../store';
+import { analyzeIssue } from '../services/llm';
+import { saveIssue } from '../services/database';
+import type { IssueAnalysis } from '../types';
+
+export default function IssueDetail() {
+  const {
+    selectedIssue,
+    setCurrentPage,
+    settings,
+    showNotification,
+  } = useAppStore();
+
+  const [analysis, setAnalysis] = useState<IssueAnalysis | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const handleBack = () => setCurrentPage('explorer');
+
+  const handleAnalyze = useCallback(async () => {
+    if (!selectedIssue) return;
+    if (!settings.openaiApiKey) {
+      showNotification('请先在设置中配置 OpenAI API Key', 'warning');
+      return;
+    }
+
+    setAnalyzing(true);
+    try {
+      const result = await analyzeIssue(
+        {
+          apiKey: settings.openaiApiKey,
+          model: settings.openaiModel,
+          baseUrl: settings.openaiBaseUrl,
+        },
+        selectedIssue
+      );
+      setAnalysis(result);
+    } catch (err) {
+      showNotification(`分析失败: ${err}`, 'error');
+    } finally {
+      setAnalyzing(false);
+    }
+  }, [selectedIssue, settings, showNotification]);
+
+  const handleSave = useCallback(async () => {
+    if (!selectedIssue) return;
+    try {
+      await saveIssue({
+        id: 0,
+        github_id: selectedIssue.id,
+        repo_full_name: selectedIssue.repo_full_name ?? '',
+        title: selectedIssue.title,
+        body: selectedIssue.body,
+        labels: JSON.stringify(selectedIssue.labels),
+        state: selectedIssue.state,
+        score: null,
+        analysis: analysis ? JSON.stringify(analysis) : null,
+        saved_at: new Date().toISOString(),
+      });
+      setSaved(true);
+      showNotification('Issue 已收藏', 'success');
+    } catch (err) {
+      showNotification(`收藏失败: ${err}`, 'error');
+    }
+  }, [selectedIssue, analysis, showNotification]);
+
+  const handleStartContribution = () => {
+    showNotification('Draft PR 流程即将推出', 'info');
+  };
+
+  if (!selectedIssue) {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Button startIcon={<BackIcon />} onClick={handleBack}>
+          返回探索
+        </Button>
+        <Typography sx={{ mt: 4, textAlign: 'center' }}>
+          未选择 Issue
+        </Typography>
+      </Box>
+    );
+  }
+
+  const difficultyColors = {
+    easy: '#66BB6A',
+    medium: '#FFA726',
+    hard: '#EF5350',
+  };
+
+  const difficultyLabels = {
+    easy: '简单',
+    medium: '中等',
+    hard: '困难',
+  };
+
+  return (
+    <Box sx={{ p: 3, height: '100%', overflow: 'auto' }}>
+      <Fade in timeout={400}>
+        <Box>
+          {/* Back + Actions */}
+          <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 3 }}>
+            <Button startIcon={<BackIcon />} onClick={handleBack}>
+              返回
+            </Button>
+            <Stack direction="row" spacing={1}>
+              <Button
+                variant="outlined"
+                startIcon={<BookmarkIcon />}
+                onClick={handleSave}
+                disabled={saved}
+                color={saved ? 'success' : 'primary'}
+              >
+                {saved ? '已收藏' : '收藏'}
+              </Button>
+              <Button
+                variant="outlined"
+                startIcon={<AIIcon />}
+                onClick={handleAnalyze}
+                disabled={analyzing}
+              >
+                {analyzing ? <CircularProgress size={18} /> : 'AI 分析'}
+              </Button>
+              <Button
+                variant="contained"
+                startIcon={<StartIcon />}
+                onClick={handleStartContribution}
+              >
+                开始贡献
+              </Button>
+            </Stack>
+          </Stack>
+
+          {/* Issue Header */}
+          <Card sx={{ mb: 3 }}>
+            <CardContent>
+              <Typography variant="h5" fontWeight={700} gutterBottom>
+                #{selectedIssue.number} {selectedIssue.title}
+              </Typography>
+
+              {selectedIssue.repo_full_name && (
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                  {selectedIssue.repo_full_name}
+                </Typography>
+              )}
+
+              <Stack direction="row" spacing={1} sx={{ mb: 2, flexWrap: 'wrap', gap: 0.5 }}>
+                {selectedIssue.labels.map((label) => (
+                  <Chip
+                    key={label.id}
+                    label={label.name}
+                    size="small"
+                    sx={{
+                      backgroundColor: `#${label.color}22`,
+                      color: `#${label.color}`,
+                      border: `1px solid #${label.color}44`,
+                      fontWeight: 500,
+                    }}
+                  />
+                ))}
+              </Stack>
+
+              <Stack direction="row" spacing={3} sx={{ color: 'text.secondary' }}>
+                <Typography variant="caption">
+                  状态: <strong>{selectedIssue.state}</strong>
+                </Typography>
+                <Typography variant="caption">
+                  评论: <strong>{selectedIssue.comments}</strong>
+                </Typography>
+                <Typography variant="caption">
+                  作者: <strong>{selectedIssue.user.login}</strong>
+                </Typography>
+                <IconButton
+                  size="small"
+                  onClick={() => window.open(selectedIssue.html_url, '_blank')}
+                  sx={{ ml: 'auto' }}
+                >
+                  <OpenIcon fontSize="small" />
+                </IconButton>
+              </Stack>
+            </CardContent>
+          </Card>
+
+          <Box sx={{ display: 'flex', gap: 3 }}>
+            {/* Issue Body (Markdown) */}
+            <Card sx={{ flex: 1 }}>
+              <CardContent>
+                <Typography variant="h6" fontWeight={600} gutterBottom>
+                  Issue 内容
+                </Typography>
+                <Divider sx={{ mb: 2 }} />
+                <Box
+                  sx={{
+                    '& img': { maxWidth: '100%', borderRadius: 1 },
+                    '& code': {
+                      backgroundColor: (theme) => alpha(theme.palette.primary.main, 0.08),
+                      px: 0.5,
+                      py: 0.25,
+                      borderRadius: 0.5,
+                      fontSize: '0.85em',
+                      fontFamily: 'monospace',
+                    },
+                    '& pre': {
+                      backgroundColor: (theme) => alpha(theme.palette.background.default, 0.8),
+                      p: 2,
+                      borderRadius: 2,
+                      overflow: 'auto',
+                      '& code': {
+                        backgroundColor: 'transparent',
+                        p: 0,
+                      },
+                    },
+                    '& a': { color: 'primary.main' },
+                    '& blockquote': {
+                      borderLeft: (theme) => `3px solid ${theme.palette.primary.main}`,
+                      pl: 2,
+                      ml: 0,
+                      opacity: 0.8,
+                    },
+                  }}
+                >
+                  {selectedIssue.body ? (
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {selectedIssue.body}
+                    </ReactMarkdown>
+                  ) : (
+                    <Typography color="text.secondary" fontStyle="italic">
+                      暂无描述
+                    </Typography>
+                  )}
+                </Box>
+              </CardContent>
+            </Card>
+
+            {/* AI Analysis Panel */}
+            <Box sx={{ width: 320, flexShrink: 0 }}>
+              <Card>
+                <CardContent>
+                  <Typography variant="h6" fontWeight={600} gutterBottom>
+                    <AIIcon sx={{ mr: 1, verticalAlign: 'middle', color: 'primary.main' }} />
+                    AI 分析
+                  </Typography>
+                  <Divider sx={{ mb: 2 }} />
+
+                  {analyzing && (
+                    <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                      <CircularProgress />
+                    </Box>
+                  )}
+
+                  {!analysis && !analyzing && (
+                    <Box sx={{ textAlign: 'center', py: 3, opacity: 0.5 }}>
+                      <AIIcon sx={{ fontSize: 40, mb: 1 }} />
+                      <Typography variant="body2">
+                        点击「AI 分析」按钮获取
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        智能评估难度和推荐解法
+                      </Typography>
+                    </Box>
+                  )}
+
+                  {analysis && (
+                    <Fade in timeout={500}>
+                      <Box>
+                        {/* Difficulty */}
+                        <Box sx={{ mb: 2 }}>
+                          <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
+                            <DifficultyIcon sx={{ fontSize: 18, color: difficultyColors[analysis.difficulty] }} />
+                            <Typography variant="subtitle2">难度评估</Typography>
+                          </Stack>
+                          <Chip
+                            label={difficultyLabels[analysis.difficulty]}
+                            size="small"
+                            sx={{
+                              backgroundColor: alpha(difficultyColors[analysis.difficulty], 0.15),
+                              color: difficultyColors[analysis.difficulty],
+                              fontWeight: 600,
+                            }}
+                          />
+                        </Box>
+
+                        {/* Time estimate */}
+                        <Box sx={{ mb: 2 }}>
+                          <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
+                            <TimeIcon sx={{ fontSize: 18, color: 'text.secondary' }} />
+                            <Typography variant="subtitle2">预估时间</Typography>
+                          </Stack>
+                          <Typography variant="body2" color="text.secondary">
+                            {analysis.estimatedTime}
+                          </Typography>
+                        </Box>
+
+                        {/* Approach */}
+                        <Box sx={{ mb: 2 }}>
+                          <Typography variant="subtitle2" gutterBottom>
+                            建议方向
+                          </Typography>
+                          <Typography
+                            variant="body2"
+                            color="text.secondary"
+                            sx={{ lineHeight: 1.7 }}
+                          >
+                            {analysis.suggestedApproach}
+                          </Typography>
+                        </Box>
+
+                        {/* Related files */}
+                        {analysis.relatedFiles.length > 0 && (
+                          <Box sx={{ mb: 2 }}>
+                            <Typography variant="subtitle2" gutterBottom>
+                              可能涉及文件
+                            </Typography>
+                            <Stack spacing={0.5}>
+                              {analysis.relatedFiles.map((f) => (
+                                <Typography
+                                  key={f}
+                                  variant="caption"
+                                  sx={{
+                                    fontFamily: 'monospace',
+                                    backgroundColor: (theme) =>
+                                      alpha(theme.palette.primary.main, 0.06),
+                                    px: 1,
+                                    py: 0.5,
+                                    borderRadius: 1,
+                                  }}
+                                >
+                                  {f}
+                                </Typography>
+                              ))}
+                            </Stack>
+                          </Box>
+                        )}
+
+                        {/* Tags */}
+                        {analysis.tags.length > 0 && (
+                          <Box>
+                            <Typography variant="subtitle2" gutterBottom>
+                              相关技术
+                            </Typography>
+                            <Stack direction="row" spacing={0.5} sx={{ flexWrap: 'wrap', gap: 0.5 }}>
+                              {analysis.tags.map((tag) => (
+                                <Chip key={tag} label={tag} size="small" variant="outlined" />
+                              ))}
+                            </Stack>
+                          </Box>
+                        )}
+                      </Box>
+                    </Fade>
+                  )}
+                </CardContent>
+              </Card>
+            </Box>
+          </Box>
+        </Box>
+      </Fade>
+    </Box>
+  );
+}

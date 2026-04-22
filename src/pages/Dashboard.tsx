@@ -151,7 +151,7 @@ export default function Dashboard() {
       label: '收藏 Issue',
       value: stats.savedIssues,
       icon: <BookmarkIcon />,
-      gradient: 'linear-gradient(135deg, #00E5FF 0%, #6EFFFF 100%)',
+      gradient: 'linear-gradient(135deg, #0097A7 0%, #4DD0E1 100%)',
       onClick: () => {
         if (savedIssues.length > 0) {
           savedIssuesSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });

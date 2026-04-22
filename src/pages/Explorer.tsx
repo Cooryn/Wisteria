@@ -7,7 +7,7 @@ import {
   Grid2 as Grid,
   CircularProgress,
   Stack,
-  Chip,
+  IconButton,
   InputAdornment,
   FormControl,
   InputLabel,
@@ -20,6 +20,7 @@ import {
 import {
   Search as SearchIcon,
   FilterList as FilterIcon,
+  Close as CloseIcon,
 } from '@mui/icons-material';
 import { useAppStore } from '../store';
 import { searchRepositories, buildSearchQuery, searchIssues } from '../services/github';
@@ -268,13 +269,15 @@ export default function Explorer() {
         </Stack>
       </Box>
 
-      <Box sx={{ flex: 1, display: 'flex', gap: 3, overflow: 'hidden' }}>
+      <Box sx={{ flex: 1, display: 'flex', gap: 3, overflow: 'hidden', minWidth: 0 }}>
         <Box
           sx={{
-            flex: selectedRepo ? '0 0 45%' : '1',
+            flex: selectedRepo ? '0 1 44%' : '1 1 100%',
+            minWidth: 0,
             overflow: 'auto',
-            transition: 'flex 0.3s ease',
-            pr: 1,
+            transition: 'flex-basis 0.3s ease',
+            pr: selectedRepo ? 1 : 0,
+            scrollbarGutter: 'stable',
           }}
         >
           {loadingRepos ? (
@@ -317,10 +320,13 @@ export default function Explorer() {
           <Fade in timeout={400}>
             <Box
               sx={{
-                flex: '0 0 55%',
+                flex: '1 1 0',
+                minWidth: 0,
                 borderLeft: (theme) => `1px solid ${theme.palette.divider}`,
                 pl: 3,
+                pr: 1,
                 overflow: 'auto',
+                scrollbarGutter: 'stable',
               }}
             >
               <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
@@ -332,14 +338,24 @@ export default function Explorer() {
                     开放 Issue 列表
                   </Typography>
                 </Box>
-                <Chip
-                  label="关闭"
+                <IconButton
+                  aria-label="close issue list"
                   size="small"
                   onClick={() => {
                     setSelectedRepo(null);
                     setIssues([]);
                   }}
-                />
+                  sx={{
+                    border: (theme) => `1px solid ${theme.palette.divider}`,
+                    color: 'text.secondary',
+                    '&:hover': {
+                      backgroundColor: 'action.hover',
+                      color: 'text.primary',
+                    },
+                  }}
+                >
+                  <CloseIcon fontSize="small" />
+                </IconButton>
               </Stack>
 
               <Divider sx={{ mb: 2 }} />

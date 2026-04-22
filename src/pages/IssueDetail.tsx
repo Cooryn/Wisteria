@@ -13,6 +13,7 @@ import {
   alpha,
   Fade,
 } from '@mui/material';
+import { openUrl } from '@tauri-apps/plugin-opener';
 import {
   ArrowBack as BackIcon,
   OpenInNew as OpenIcon,
@@ -143,6 +144,16 @@ export default function IssueDetail() {
     }
   }, [analysis, saved, selectedIssue, showNotification]);
 
+  const handleOpenIssue = useCallback(async () => {
+    if (!selectedIssue?.html_url) return;
+
+    try {
+      await openUrl(selectedIssue.html_url);
+    } catch (err) {
+      showNotification(`æ‰“å¼€ GitHub Issue å¤±è´¥: ${err}`, 'error');
+    }
+  }, [selectedIssue, showNotification]);
+
   const handleStartContribution = () => {
     showNotification('Draft PR 流程即将推出', 'info');
   };
@@ -205,7 +216,7 @@ export default function IssueDetail() {
           </Stack>
 
           <Card sx={{ mb: 3 }}>
-            <CardContent>
+            <CardContent sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               <Typography variant="h5" fontWeight={700} gutterBottom>
                 #{selectedIssue.number} {selectedIssue.title}
               </Typography>
@@ -216,7 +227,7 @@ export default function IssueDetail() {
                 </Typography>
               )}
 
-              <Stack direction="row" spacing={1} sx={{ mb: 2, flexWrap: 'wrap', gap: 0.5 }}>
+              <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 0.5 }}>
                 {selectedIssue.labels.map((label) => (
                   <Chip
                     key={`${label.id}-${label.name}`}
@@ -232,7 +243,12 @@ export default function IssueDetail() {
                 ))}
               </Stack>
 
-              <Stack direction="row" spacing={3} sx={{ color: 'text.secondary' }}>
+              <Stack
+                direction="row"
+                spacing={3}
+                useFlexGap
+                sx={{ flexWrap: 'wrap', color: 'text.secondary', alignItems: 'center' }}
+              >
                 <Typography variant="caption">
                   状态: <strong>{selectedIssue.state}</strong>
                 </Typography>
@@ -245,8 +261,14 @@ export default function IssueDetail() {
                 {selectedIssue.html_url && (
                   <IconButton
                     size="small"
-                    onClick={() => window.open(selectedIssue.html_url, '_blank')}
-                    sx={{ ml: 'auto' }}
+                    aria-label="open issue on github"
+                    onClick={handleOpenIssue}
+                    sx={{
+                      ml: 'auto',
+                      mt: -0.5,
+                      border: (theme) => `1px solid ${theme.palette.divider}`,
+                      borderRadius: 2,
+                    }}
                   >
                     <OpenIcon fontSize="small" />
                   </IconButton>
@@ -256,14 +278,17 @@ export default function IssueDetail() {
           </Card>
 
           <Box sx={{ display: 'flex', gap: 3 }}>
-            <Card sx={{ flex: 1 }}>
-              <CardContent>
+            <Card sx={{ flex: 1, minWidth: 0 }}>
+              <CardContent sx={{ px: { xs: 2.5, md: 3 }, py: 3 }}>
                 <Typography variant="h6" fontWeight={600} gutterBottom>
                   Issue 内容
                 </Typography>
                 <Divider sx={{ mb: 2 }} />
                 <Box
                   sx={{
+                    px: { xs: 0.5, md: 1.5 },
+                    minWidth: 0,
+                    overflow: 'hidden',
                     '& img': { maxWidth: '100%', borderRadius: 1 },
                     '& code': {
                       backgroundColor: (theme) => alpha(theme.palette.primary.main, 0.08),
@@ -277,6 +302,7 @@ export default function IssueDetail() {
                       backgroundColor: (theme) => alpha(theme.palette.background.default, 0.8),
                       p: 2,
                       borderRadius: 2,
+                      maxWidth: '100%',
                       overflow: 'auto',
                       '& code': {
                         backgroundColor: 'transparent',
@@ -289,6 +315,27 @@ export default function IssueDetail() {
                       pl: 2,
                       ml: 0,
                       opacity: 0.8,
+                    },
+                    '& table': {
+                      display: 'block',
+                      width: '100%',
+                      maxWidth: '100%',
+                      overflowX: 'auto',
+                      borderCollapse: 'collapse',
+                    },
+                    '& p, & li, & td, & th': {
+                      overflowWrap: 'anywhere',
+                      wordBreak: 'break-word',
+                    },
+                    '& ul, & ol': {
+                      pl: 3,
+                      pr: 1,
+                    },
+                    '& > *:first-of-type': {
+                      mt: 0,
+                    },
+                    '& > *:last-child': {
+                      mb: 0,
                     },
                   }}
                 >

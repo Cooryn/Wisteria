@@ -22,7 +22,7 @@ interface IssueCardProps {
 
 export default function IssueCard({ issue, score, onClick }: IssueCardProps) {
   return (
-    <Card sx={{ mb: 1.5 }}>
+    <Card sx={{ mb: 1.5, overflow: 'hidden' }}>
       <CardActionArea onClick={onClick}>
         <CardContent sx={{ py: 2, px: 2.5, '&:last-child': { pb: 2 } }}>
           <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
@@ -70,7 +70,12 @@ export default function IssueCard({ issue, score, onClick }: IssueCardProps) {
               </Stack>
 
               {/* Meta info */}
-              <Stack direction="row" spacing={2} alignItems="center">
+              <Stack
+                direction="row"
+                alignItems="center"
+                useFlexGap
+                sx={{ flexWrap: 'wrap', columnGap: 2, rowGap: 0.75 }}
+              >
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                   <CommentIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
                   <Typography variant="caption" color="text.secondary">
@@ -83,7 +88,11 @@ export default function IssueCard({ issue, score, onClick }: IssueCardProps) {
                     {formatTimeAgo(issue.updated_at)}
                   </Typography>
                 </Box>
-                <Typography variant="caption" color="text.secondary">
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ overflowWrap: 'anywhere' }}
+                >
                   by {issue.user.login}
                 </Typography>
               </Stack>

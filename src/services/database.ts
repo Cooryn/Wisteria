@@ -1,4 +1,4 @@
-import Database from '@tauri-apps/plugin-sql';
+import { invoke } from '@tauri-apps/api/core';
 import type {
   ContributionSession,
   PRHistoryEntry,
@@ -7,256 +7,161 @@ import type {
   TechTag,
 } from '../types';
 
-let db: Database | null = null;
-
-export async function getDb(): Promise<Database> {
-  if (!db) {
-    db = await Database.load('sqlite:wisteria.db');
-  }
-  return db;
-}
-
 // ---- App Settings ----
+
 export async function getSetting(key: string): Promise<string | null> {
-  const d = await getDb();
-  const rows = await d.select<{ value: string }[]>(
-    'SELECT value FROM app_settings WHERE key = $1',
-    [key]
-  );
-  return rows.length > 0 ? rows[0].value : null;
+  return invoke<string | null>('db_get_setting', { key });
 }
 
 export async function setSetting(key: string, value: string): Promise<void> {
-  const d = await getDb();
-  await d.execute(
-    `INSERT INTO app_settings (key, value) VALUES ($1, $2)
-     ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
-    [key, value]
-  );
+  return invoke<void>('db_set_setting', { key, value });
 }
 
 export async function getAllSettings(): Promise<Record<string, string>> {
-  const d = await getDb();
-  const rows = await d.select<{ key: string; value: string }[]>(
-    'SELECT key, value FROM app_settings'
-  );
-  const result: Record<string, string> = {};
-  for (const row of rows) {
-    result[row.key] = row.value;
-  }
-  return result;
+  return invoke<Record<string, string>>('db_get_all_settings');
 }
 
 // ---- Tech Tags ----
+
 export async function getTechTags(): Promise<TechTag[]> {
-  const d = await getDb();
-  return d.select<TechTag[]>('SELECT * FROM tech_tags ORDER BY category, name');
+  return invoke<TechTag[]>('db_get_tech_tags');
 }
 
 export async function saveTechTag(tag: TechTag): Promise<void> {
-  const d = await getDb();
-  await d.execute(
-    `INSERT INTO tech_tags (name, category, weight) VALUES ($1, $2, $3)
-     ON CONFLICT(name) DO UPDATE SET category = excluded.category, weight = excluded.weight`,
-    [tag.name, tag.category, tag.weight]
-  );
+  return invoke<void>('db_save_tech_tag', {
+    name: tag.name,
+    category: tag.category,
+    weight: tag.weight,
+  });
 }
 
 export async function deleteTechTag(name: string): Promise<void> {
-  const d = await getDb();
-  await d.execute('DELETE FROM tech_tags WHERE name = $1', [name]);
+  return invoke<void>('db_delete_tech_tag', { name });
 }
 
 export async function clearTechTags(): Promise<void> {
-  const d = await getDb();
-  await d.execute('DELETE FROM tech_tags');
+  return invoke<void>('db_clear_tech_tags');
 }
 
 // ---- Saved Repos ----
+
 export async function getSavedRepos(): Promise<SavedRepo[]> {
-  const d = await getDb();
-  return d.select<SavedRepo[]>(
-    'SELECT * FROM saved_repos ORDER BY score DESC, saved_at DESC'
-  );
+  return invoke<SavedRepo[]>('db_get_saved_repos');
 }
 
 export async function saveRepo(repo: SavedRepo): Promise<void> {
-  const d = await getDb();
-  await d.execute(
-    `INSERT INTO saved_repos (github_id, full_name, description, language, stars, topics, score)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
-     ON CONFLICT(github_id) DO UPDATE SET score = excluded.score`,
-    [repo.github_id, repo.full_name, repo.description, repo.language, repo.stars, repo.topics, repo.score]
-  );
+  return invoke<void>('db_save_repo', {
+    repo: {
+      githubId: repo.github_id,
+      fullName: repo.full_name,
+      description: repo.description,
+      language: repo.language,
+      stars: repo.stars,
+      topics: repo.topics,
+      score: repo.score,
+    },
+  });
 }
 
 export async function deleteSavedRepo(githubId: number): Promise<void> {
-  const d = await getDb();
-  await d.execute('DELETE FROM saved_repos WHERE github_id = $1', [githubId]);
+  return invoke<void>('db_delete_saved_repo', { githubId });
 }
 
 // ---- Saved Issues ----
+
 export async function getSavedIssues(): Promise<SavedIssue[]> {
-  const d = await getDb();
-  return d.select<SavedIssue[]>(
-    'SELECT * FROM saved_issues ORDER BY saved_at DESC'
-  );
+  return invoke<SavedIssue[]>('db_get_saved_issues');
 }
 
 export async function getSavedIssueByGitHubId(githubId: number): Promise<SavedIssue | null> {
-  const d = await getDb();
-  const rows = await d.select<SavedIssue[]>(
-    'SELECT * FROM saved_issues WHERE github_id = $1 LIMIT 1',
-    [githubId]
-  );
-  return rows[0] ?? null;
+  return invoke<SavedIssue | null>('db_get_saved_issue_by_github_id', { githubId });
 }
 
 export async function saveIssue(issue: SavedIssue): Promise<void> {
-  const d = await getDb();
-  await d.execute(
-    `INSERT INTO saved_issues (
-       github_id, repo_full_name, issue_number, title, body, labels, state,
-       html_url, comments, user_login, user_avatar_url, created_at, updated_at,
-       score, analysis
-     )
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
-     ON CONFLICT(github_id) DO UPDATE SET
-       repo_full_name = excluded.repo_full_name,
-       issue_number = excluded.issue_number,
-       title = excluded.title,
-       body = excluded.body,
-       labels = excluded.labels,
-       state = excluded.state,
-       html_url = excluded.html_url,
-       comments = excluded.comments,
-       user_login = excluded.user_login,
-       user_avatar_url = excluded.user_avatar_url,
-       created_at = excluded.created_at,
-       updated_at = excluded.updated_at,
-       score = excluded.score,
-       analysis = excluded.analysis`,
-    [
-      issue.github_id,
-      issue.repo_full_name,
-      issue.issue_number,
-      issue.title,
-      issue.body,
-      issue.labels,
-      issue.state,
-      issue.html_url,
-      issue.comments,
-      issue.user_login,
-      issue.user_avatar_url,
-      issue.created_at,
-      issue.updated_at,
-      issue.score,
-      issue.analysis,
-    ]
-  );
+  return invoke<void>('db_save_issue', {
+    issue: {
+      githubId: issue.github_id,
+      repoFullName: issue.repo_full_name,
+      issueNumber: issue.issue_number,
+      title: issue.title,
+      body: issue.body,
+      labels: issue.labels,
+      state: issue.state,
+      htmlUrl: issue.html_url,
+      comments: issue.comments,
+      userLogin: issue.user_login,
+      userAvatarUrl: issue.user_avatar_url,
+      createdAt: issue.created_at,
+      updatedAt: issue.updated_at,
+      score: issue.score,
+      analysis: issue.analysis,
+    },
+  });
 }
 
 export async function deleteSavedIssue(githubId: number): Promise<void> {
-  const d = await getDb();
-  await d.execute('DELETE FROM saved_issues WHERE github_id = $1', [githubId]);
+  return invoke<void>('db_delete_saved_issue', { githubId });
 }
 
 // ---- PR History ----
+
 export async function getPRHistory(): Promise<PRHistoryEntry[]> {
-  const d = await getDb();
-  return d.select<PRHistoryEntry[]>(
-    'SELECT * FROM pr_history ORDER BY created_at DESC'
-  );
+  return invoke<PRHistoryEntry[]>('db_get_pr_history');
 }
 
 export async function addPRHistory(entry: Omit<PRHistoryEntry, 'id' | 'created_at'>): Promise<void> {
-  const d = await getDb();
-  await d.execute(
-    `INSERT INTO pr_history (issue_id, repo_full_name, pr_url, branch_name, status)
-     VALUES ($1, $2, $3, $4, $5)`,
-    [entry.issue_id, entry.repo_full_name, entry.pr_url, entry.branch_name, entry.status]
-  );
+  return invoke<void>('db_add_pr_history', {
+    issueId: entry.issue_id,
+    repoFullName: entry.repo_full_name,
+    prUrl: entry.pr_url,
+    branchName: entry.branch_name,
+    status: entry.status,
+  });
 }
 
 // ---- Contribution Sessions ----
+
 export async function getContributionSessionByIssueGitHubId(
   issueGitHubId: number
 ): Promise<ContributionSession | null> {
-  const d = await getDb();
-  const rows = await d.select<ContributionSession[]>(
-    'SELECT * FROM contribution_sessions WHERE issue_github_id = $1 LIMIT 1',
-    [issueGitHubId]
-  );
-  return rows[0] ?? null;
+  return invoke<ContributionSession | null>('db_get_contribution_session', { issueGithubId: issueGitHubId });
 }
 
 export async function upsertContributionSession(
   session: Omit<ContributionSession, 'id' | 'created_at' | 'updated_at'>
 ): Promise<void> {
-  const d = await getDb();
-  await d.execute(
-    `INSERT INTO contribution_sessions (
-       issue_github_id, repo_full_name, local_repo_path, fork_full_name,
-       push_remote_name, base_branch, branch_name, pr_url, status
-     )
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-     ON CONFLICT(issue_github_id) DO UPDATE SET
-       repo_full_name = excluded.repo_full_name,
-       local_repo_path = excluded.local_repo_path,
-       fork_full_name = excluded.fork_full_name,
-       push_remote_name = excluded.push_remote_name,
-       base_branch = excluded.base_branch,
-       branch_name = excluded.branch_name,
-       pr_url = excluded.pr_url,
-       status = excluded.status,
-       updated_at = CURRENT_TIMESTAMP`,
-    [
-      session.issue_github_id,
-      session.repo_full_name,
-      session.local_repo_path,
-      session.fork_full_name,
-      session.push_remote_name,
-      session.base_branch,
-      session.branch_name,
-      session.pr_url,
-      session.status,
-    ]
-  );
+  return invoke<void>('db_upsert_contribution_session', {
+    session: {
+      issueGithubId: session.issue_github_id,
+      repoFullName: session.repo_full_name,
+      localRepoPath: session.local_repo_path,
+      forkFullName: session.fork_full_name,
+      pushRemoteName: session.push_remote_name,
+      baseBranch: session.base_branch,
+      branchName: session.branch_name,
+      prUrl: session.pr_url,
+      status: session.status,
+    },
+  });
 }
 
 export async function updateContributionSessionDraftPR(
   issueGitHubId: number,
   prUrl: string
 ): Promise<void> {
-  const d = await getDb();
-  await d.execute(
-    `UPDATE contribution_sessions
-     SET pr_url = $1, status = 'draft_created', updated_at = CURRENT_TIMESTAMP
-     WHERE issue_github_id = $2`,
-    [prUrl, issueGitHubId]
-  );
+  return invoke<void>('db_update_contribution_session_pr', { issueGithubId: issueGitHubId, prUrl });
 }
 
 export async function deleteContributionSession(issueGitHubId: number): Promise<void> {
-  const d = await getDb();
-  await d.execute('DELETE FROM contribution_sessions WHERE issue_github_id = $1', [issueGitHubId]);
+  return invoke<void>('db_delete_contribution_session', { issueGithubId: issueGitHubId });
 }
 
 // ---- Preferences (simple key-value) ----
+
 export async function getPreference(key: string): Promise<string | null> {
-  const d = await getDb();
-  const rows = await d.select<{ value: string }[]>(
-    'SELECT value FROM preferences WHERE key = $1',
-    [key]
-  );
-  return rows.length > 0 ? rows[0].value : null;
+  return invoke<string | null>('db_get_preference', { key });
 }
 
 export async function setPreference(key: string, value: string): Promise<void> {
-  const d = await getDb();
-  await d.execute(
-    `INSERT INTO preferences (key, value, updated_at) VALUES ($1, $2, CURRENT_TIMESTAMP)
-     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP`,
-    [key, value]
-  );
+  return invoke<void>('db_set_preference', { key, value });
 }

@@ -1,75 +1,16 @@
-use serde::{Deserialize, Serialize};
+mod db;
+mod git;
+mod llm;
+
+use serde::Serialize;
 use std::path::Path;
-use std::process::Command;
-use tauri_plugin_sql::{Migration, MigrationKind};
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct GitCommandInput {
-    args: Vec<String>,
-    cwd: Option<String>,
-    git_path: Option<String>,
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct GitCommandOutput {
-    success: bool,
-    stdout: String,
-    stderr: String,
-}
+use tauri::Manager;
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct LocalPathInfo {
     exists: bool,
     is_dir: bool,
-}
-
-fn is_git_executable(path: &str) -> bool {
-    Path::new(path)
-        .file_stem()
-        .and_then(|stem| stem.to_str())
-        .map(|stem| stem.eq_ignore_ascii_case("git"))
-        .unwrap_or(false)
-}
-
-#[tauri::command]
-fn run_git_command(input: GitCommandInput) -> GitCommandOutput {
-    let git_path = input
-        .git_path
-        .as_deref()
-        .map(str::trim)
-        .filter(|path| !path.is_empty())
-        .unwrap_or("git");
-
-    if git_path != "git" && !is_git_executable(git_path) {
-        return GitCommandOutput {
-            success: false,
-            stdout: String::new(),
-            stderr: "Configured Git path must point to a git executable.".into(),
-        };
-    }
-
-    let mut command = Command::new(git_path);
-    command.args(&input.args);
-
-    if let Some(cwd) = input.cwd.as_deref().map(str::trim).filter(|cwd| !cwd.is_empty()) {
-        command.current_dir(cwd);
-    }
-
-    match command.output() {
-        Ok(output) => GitCommandOutput {
-            success: output.status.success(),
-            stdout: String::from_utf8_lossy(&output.stdout).trim().to_string(),
-            stderr: String::from_utf8_lossy(&output.stderr).trim().to_string(),
-        },
-        Err(err) => GitCommandOutput {
-            success: false,
-            stdout: String::new(),
-            stderr: err.to_string(),
-        },
-    }
 }
 
 #[tauri::command]
@@ -91,113 +32,76 @@ fn inspect_local_path(path: String) -> LocalPathInfo {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let migrations = vec![
-        Migration {
-            version: 1,
-            description: "create initial tables",
-            sql: r#"
-                CREATE TABLE IF NOT EXISTS preferences (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    key TEXT UNIQUE NOT NULL,
-                    value TEXT NOT NULL,
-                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-                );
-
-                CREATE TABLE IF NOT EXISTS tech_tags (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    name TEXT UNIQUE NOT NULL,
-                    category TEXT NOT NULL,
-                    weight REAL DEFAULT 1.0
-                );
-
-                CREATE TABLE IF NOT EXISTS saved_repos (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    github_id INTEGER UNIQUE NOT NULL,
-                    full_name TEXT NOT NULL,
-                    description TEXT,
-                    language TEXT,
-                    stars INTEGER,
-                    topics TEXT,
-                    score REAL,
-                    saved_at DATETIME DEFAULT CURRENT_TIMESTAMP
-                );
-
-                CREATE TABLE IF NOT EXISTS saved_issues (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    github_id INTEGER UNIQUE NOT NULL,
-                    repo_full_name TEXT NOT NULL,
-                    title TEXT NOT NULL,
-                    body TEXT,
-                    labels TEXT,
-                    state TEXT,
-                    score REAL,
-                    analysis TEXT,
-                    saved_at DATETIME DEFAULT CURRENT_TIMESTAMP
-                );
-
-                CREATE TABLE IF NOT EXISTS app_settings (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    key TEXT UNIQUE NOT NULL,
-                    value TEXT NOT NULL
-                );
-
-                CREATE TABLE IF NOT EXISTS pr_history (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    issue_id INTEGER,
-                    repo_full_name TEXT NOT NULL,
-                    pr_url TEXT,
-                    branch_name TEXT,
-                    status TEXT DEFAULT 'draft',
-                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (issue_id) REFERENCES saved_issues(id)
-                );
-            "#,
-            kind: MigrationKind::Up,
-        },
-        Migration {
-            version: 2,
-            description: "expand saved issues for reopening details",
-            sql: r#"
-                ALTER TABLE saved_issues ADD COLUMN issue_number INTEGER;
-                ALTER TABLE saved_issues ADD COLUMN html_url TEXT;
-                ALTER TABLE saved_issues ADD COLUMN comments INTEGER;
-                ALTER TABLE saved_issues ADD COLUMN user_login TEXT;
-                ALTER TABLE saved_issues ADD COLUMN user_avatar_url TEXT;
-                ALTER TABLE saved_issues ADD COLUMN created_at TEXT;
-                ALTER TABLE saved_issues ADD COLUMN updated_at TEXT;
-            "#,
-            kind: MigrationKind::Up,
-        },
-        Migration {
-            version: 3,
-            description: "add contribution sessions",
-            sql: r#"
-                CREATE TABLE IF NOT EXISTS contribution_sessions (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    issue_github_id INTEGER UNIQUE NOT NULL,
-                    repo_full_name TEXT NOT NULL,
-                    local_repo_path TEXT NOT NULL,
-                    fork_full_name TEXT NOT NULL,
-                    push_remote_name TEXT NOT NULL,
-                    base_branch TEXT NOT NULL,
-                    branch_name TEXT NOT NULL,
-                    pr_url TEXT,
-                    status TEXT NOT NULL DEFAULT 'ready',
-                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-                );
-            "#,
-            kind: MigrationKind::Up,
-        },
-    ];
-
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![run_git_command, inspect_local_path])
-        .plugin(
-            tauri_plugin_sql::Builder::default()
-                .add_migrations("sqlite:wisteria.db", migrations)
-                .build(),
-        )
+        .setup(|app| {
+            let app_data_dir = app
+                .path()
+                .app_data_dir()
+                .expect("failed to resolve app data dir");
+
+            let database = db::Database::init(app_data_dir)
+                .expect("failed to initialise database");
+
+            app.manage(database);
+            Ok(())
+        })
+        .invoke_handler(tauri::generate_handler![
+            // System
+            inspect_local_path,
+            // Database — settings & preferences
+            db::settings::db_get_setting,
+            db::settings::db_set_setting,
+            db::settings::db_get_all_settings,
+            db::settings::db_get_preference,
+            db::settings::db_set_preference,
+            // Database — tech tags
+            db::tags::db_get_tech_tags,
+            db::tags::db_save_tech_tag,
+            db::tags::db_delete_tech_tag,
+            db::tags::db_clear_tech_tags,
+            // Database — saved repos
+            db::repos::db_get_saved_repos,
+            db::repos::db_save_repo,
+            db::repos::db_delete_saved_repo,
+            // Database — saved issues
+            db::issues::db_get_saved_issues,
+            db::issues::db_get_saved_issue_by_github_id,
+            db::issues::db_save_issue,
+            db::issues::db_delete_saved_issue,
+            // Database — PR history
+            db::pr_history::db_get_pr_history,
+            db::pr_history::db_add_pr_history,
+            // Database — contribution sessions
+            db::sessions::db_get_contribution_session,
+            db::sessions::db_upsert_contribution_session,
+            db::sessions::db_update_contribution_session_pr,
+            db::sessions::db_delete_contribution_session,
+            // Git
+            git::commands::git_is_available,
+            git::commands::git_get_version,
+            git::commands::git_clone,
+            git::commands::git_checkout_new_branch,
+            git::commands::git_checkout,
+            git::commands::git_checkout_branch_from,
+            git::commands::git_add_all,
+            git::commands::git_commit,
+            git::commands::git_push,
+            git::commands::git_push_with_upstream,
+            git::commands::git_fetch,
+            git::commands::git_list_remotes,
+            git::commands::git_get_remote_url,
+            git::commands::git_set_remote_url,
+            git::commands::git_add_remote,
+            git::commands::git_get_current_branch,
+            git::commands::git_is_repository,
+            git::commands::git_status,
+            git::commands::git_is_working_tree_clean,
+            git::commands::git_count_commits_ahead,
+            // LLM
+            llm::commands::llm_analyze_issue,
+            llm::commands::llm_generate_pr_description,
+            llm::commands::llm_validate_key,
+        ])
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())

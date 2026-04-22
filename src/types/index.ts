@@ -79,10 +79,17 @@ export interface SavedIssue {
   id: number;
   github_id: number;
   repo_full_name: string;
+  issue_number: number | null;
   title: string;
   body: string | null;
   labels: string; // JSON string
   state: string;
+  html_url: string | null;
+  comments: number | null;
+  user_login: string | null;
+  user_avatar_url: string | null;
+  created_at: string | null;
+  updated_at: string | null;
   score: number | null;
   analysis: string | null;
   saved_at: string;
@@ -143,7 +150,7 @@ export interface AppSettings {
   openaiModel: string;
   openaiBaseUrl: string;
   themeMode: ThemeMode;
-  workDirectory: string;
+  gitPath: string;
 }
 
 // ---- GitHub User ----

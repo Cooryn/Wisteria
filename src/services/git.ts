@@ -1,4 +1,6 @@
-import { Command } from '@tauri-apps/plugin-shell';
+import { invoke } from '@tauri-apps/api/core';
+import { getSetting } from './database';
+import { useAppStore } from '../store';
 
 export interface GitResult {
   success: boolean;
@@ -6,18 +8,42 @@ export interface GitResult {
   stderr: string;
 }
 
-async function runGit(args: string[], cwd?: string): Promise<GitResult> {
-  try {
-    const cmd = cwd
-      ? Command.create('git', ['-C', cwd, ...args])
-      : Command.create('git', args);
+interface RunGitCommandInput {
+  args: string[];
+  cwd?: string | null;
+  gitPath?: string | null;
+}
 
-    const output = await cmd.execute();
-    return {
-      success: output.code === 0,
-      stdout: output.stdout.trim(),
-      stderr: output.stderr.trim(),
-    };
+async function resolveGitPath(overridePath?: string): Promise<string | undefined> {
+  const directPath = overridePath?.trim();
+  if (directPath) {
+    return directPath;
+  }
+
+  const storePath = useAppStore.getState().settings.gitPath.trim();
+  if (storePath) {
+    return storePath;
+  }
+
+  const savedPath = (await getSetting('gitPath'))?.trim();
+  if (savedPath) {
+    useAppStore.getState().setSettings({ gitPath: savedPath });
+    return savedPath;
+  }
+
+  return undefined;
+}
+
+async function runGit(args: string[], cwd?: string, overridePath?: string): Promise<GitResult> {
+  try {
+    const gitPath = await resolveGitPath(overridePath);
+    return await invoke<GitResult>('run_git_command', {
+      input: {
+        args,
+        cwd: cwd ?? null,
+        gitPath: gitPath ?? null,
+      } satisfies RunGitCommandInput,
+    });
   } catch (err) {
     return {
       success: false,
@@ -27,60 +53,49 @@ async function runGit(args: string[], cwd?: string): Promise<GitResult> {
   }
 }
 
-// ---- Check if git is installed ----
-export async function isGitAvailable(): Promise<boolean> {
-  const result = await runGit(['--version']);
+export async function isGitAvailable(gitPath?: string): Promise<boolean> {
+  const result = await runGit(['--version'], undefined, gitPath);
   return result.success;
 }
 
-// ---- Clone a repository ----
 export async function clone(url: string, targetDir: string): Promise<GitResult> {
   return runGit(['clone', url, targetDir]);
 }
 
-// ---- Create and checkout a new branch ----
 export async function checkoutNewBranch(repoDir: string, branchName: string): Promise<GitResult> {
   return runGit(['checkout', '-b', branchName], repoDir);
 }
 
-// ---- Checkout existing branch ----
 export async function checkout(repoDir: string, branchName: string): Promise<GitResult> {
   return runGit(['checkout', branchName], repoDir);
 }
 
-// ---- Stage files ----
 export async function addAll(repoDir: string): Promise<GitResult> {
   return runGit(['add', '-A'], repoDir);
 }
 
-// ---- Commit ----
 export async function commit(repoDir: string, message: string): Promise<GitResult> {
   return runGit(['commit', '-m', message], repoDir);
 }
 
-// ---- Push ----
 export async function push(repoDir: string, remote: string, branch: string): Promise<GitResult> {
   return runGit(['push', remote, branch], repoDir);
 }
 
-// ---- Set remote ----
 export async function addRemote(repoDir: string, name: string, url: string): Promise<GitResult> {
   return runGit(['remote', 'add', name, url], repoDir);
 }
 
-// ---- Get current branch ----
 export async function getCurrentBranch(repoDir: string): Promise<string> {
   const result = await runGit(['rev-parse', '--abbrev-ref', 'HEAD'], repoDir);
   return result.stdout;
 }
 
-// ---- Get status ----
 export async function status(repoDir: string): Promise<GitResult> {
   return runGit(['status', '--porcelain'], repoDir);
 }
 
-// ---- Get git version ----
-export async function getGitVersion(): Promise<string> {
-  const result = await runGit(['--version']);
+export async function getGitVersion(gitPath?: string): Promise<string> {
+  const result = await runGit(['--version'], undefined, gitPath);
   return result.stdout;
 }

@@ -1,4 +1,69 @@
+use serde::{Deserialize, Serialize};
+use std::path::Path;
+use std::process::Command;
 use tauri_plugin_sql::{Migration, MigrationKind};
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct GitCommandInput {
+    args: Vec<String>,
+    cwd: Option<String>,
+    git_path: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct GitCommandOutput {
+    success: bool,
+    stdout: String,
+    stderr: String,
+}
+
+fn is_git_executable(path: &str) -> bool {
+    Path::new(path)
+        .file_stem()
+        .and_then(|stem| stem.to_str())
+        .map(|stem| stem.eq_ignore_ascii_case("git"))
+        .unwrap_or(false)
+}
+
+#[tauri::command]
+fn run_git_command(input: GitCommandInput) -> GitCommandOutput {
+    let git_path = input
+        .git_path
+        .as_deref()
+        .map(str::trim)
+        .filter(|path| !path.is_empty())
+        .unwrap_or("git");
+
+    if git_path != "git" && !is_git_executable(git_path) {
+        return GitCommandOutput {
+            success: false,
+            stdout: String::new(),
+            stderr: "Configured Git path must point to a git executable.".into(),
+        };
+    }
+
+    let mut command = Command::new(git_path);
+    command.args(&input.args);
+
+    if let Some(cwd) = input.cwd.as_deref().map(str::trim).filter(|cwd| !cwd.is_empty()) {
+        command.current_dir(cwd);
+    }
+
+    match command.output() {
+        Ok(output) => GitCommandOutput {
+            success: output.status.success(),
+            stdout: String::from_utf8_lossy(&output.stdout).trim().to_string(),
+            stderr: String::from_utf8_lossy(&output.stderr).trim().to_string(),
+        },
+        Err(err) => GitCommandOutput {
+            success: false,
+            stdout: String::new(),
+            stderr: err.to_string(),
+        },
+    }
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -65,9 +130,24 @@ pub fn run() {
             "#,
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 2,
+            description: "expand saved issues for reopening details",
+            sql: r#"
+                ALTER TABLE saved_issues ADD COLUMN issue_number INTEGER;
+                ALTER TABLE saved_issues ADD COLUMN html_url TEXT;
+                ALTER TABLE saved_issues ADD COLUMN comments INTEGER;
+                ALTER TABLE saved_issues ADD COLUMN user_login TEXT;
+                ALTER TABLE saved_issues ADD COLUMN user_avatar_url TEXT;
+                ALTER TABLE saved_issues ADD COLUMN created_at TEXT;
+                ALTER TABLE saved_issues ADD COLUMN updated_at TEXT;
+            "#,
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()
+        .invoke_handler(tauri::generate_handler![run_git_command])
         .plugin(
             tauri_plugin_sql::Builder::default()
                 .add_migrations("sqlite:wisteria.db", migrations)

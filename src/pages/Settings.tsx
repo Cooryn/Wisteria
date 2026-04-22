@@ -26,12 +26,15 @@ import {
   SmartToy as AIIcon,
   Terminal as GitIcon,
   DeleteSweep as ClearIcon,
+  FolderOpen as FolderIcon,
 } from '@mui/icons-material';
+import { open } from '@tauri-apps/plugin-dialog';
 import { useAppStore } from '../store';
 import { setSetting, getAllSettings } from '../services/database';
 import { validateToken, initOctokit } from '../services/github';
 import { validateOpenAIKey } from '../services/llm';
 import { isGitAvailable, getGitVersion } from '../services/git';
+import type { ThemeMode } from '../types';
 
 export default function Settings() {
   const { settings, setSettings, setUser, showNotification } = useAppStore();
@@ -45,46 +48,56 @@ export default function Settings() {
   const [saving, setSaving] = useState(false);
   const [validating, setValidating] = useState<string | null>(null);
 
-  // Load settings from DB
+  const refreshGitStatus = useCallback(async (gitPath?: string) => {
+    try {
+      const available = await isGitAvailable(gitPath);
+      setGitAvailable(available);
+
+      if (available) {
+        const version = await getGitVersion(gitPath);
+        setGitVersion(version);
+      } else {
+        setGitVersion('');
+      }
+
+      return available;
+    } catch {
+      setGitAvailable(false);
+      setGitVersion('');
+      return false;
+    }
+  }, []);
+
   useEffect(() => {
     (async () => {
       try {
         const all = await getAllSettings();
-        setSettings({
-          githubToken: all['githubToken'] ?? '',
-          openaiApiKey: all['openaiApiKey'] ?? '',
-          openaiModel: all['openaiModel'] ?? 'gpt-4o',
-          openaiBaseUrl: all['openaiBaseUrl'] ?? 'https://api.openai.com/v1',
-          themeMode: (all['themeMode'] as any) ?? 'system',
-          workDirectory: all['workDirectory'] ?? '',
-        });
+        const nextSettings = {
+          githubToken: all.githubToken ?? '',
+          openaiApiKey: all.openaiApiKey ?? '',
+          openaiModel: all.openaiModel ?? 'gpt-4o',
+          openaiBaseUrl: all.openaiBaseUrl ?? 'https://api.openai.com/v1',
+          themeMode: (all.themeMode as ThemeMode) ?? 'system',
+          gitPath: all.gitPath ?? '',
+        };
 
-        // Check token validity if token exists
-        if (all['githubToken']) {
-          const user = await validateToken(all['githubToken']);
+        setSettings(nextSettings);
+
+        if (all.githubToken) {
+          const user = await validateToken(all.githubToken);
           if (user) {
             setTokenValid(true);
             setUser(user);
-            initOctokit(all['githubToken']);
+            initOctokit(all.githubToken);
           }
         }
-      } catch {
-        // DB not ready
-      }
 
-      // Check git
-      try {
-        const available = await isGitAvailable();
-        setGitAvailable(available);
-        if (available) {
-          const ver = await getGitVersion();
-          setGitVersion(ver);
-        }
+        await refreshGitStatus(nextSettings.gitPath);
       } catch {
-        setGitAvailable(false);
+        await refreshGitStatus();
       }
     })();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [refreshGitStatus, setSettings, setUser]);
 
   const handleSave = useCallback(async () => {
     setSaving(true);
@@ -93,15 +106,38 @@ export default function Settings() {
       await setSetting('openaiApiKey', settings.openaiApiKey);
       await setSetting('openaiModel', settings.openaiModel);
       await setSetting('openaiBaseUrl', settings.openaiBaseUrl);
-      await setSetting('workDirectory', settings.workDirectory);
+      await setSetting('gitPath', settings.gitPath);
 
-      showNotification('设置已保存', 'success');
+      const available = await refreshGitStatus(settings.gitPath);
+      if (settings.gitPath.trim() && !available) {
+        showNotification('设置已保存，但当前 Git 路径不可用', 'warning');
+      } else {
+        showNotification('设置已保存', 'success');
+      }
     } catch (err) {
       showNotification(`保存失败: ${err}`, 'error');
     } finally {
       setSaving(false);
     }
-  }, [settings, showNotification]);
+  }, [refreshGitStatus, settings, showNotification]);
+
+  const handlePickGitExecutable = useCallback(async () => {
+    try {
+      const selected = await open({
+        directory: false,
+        multiple: false,
+        title: '选择 Git 可执行文件',
+        filters: [{ name: 'Git Executable', extensions: ['exe'] }],
+      });
+
+      if (selected && typeof selected === 'string') {
+        setSettings({ gitPath: selected });
+        await refreshGitStatus(selected);
+      }
+    } catch (err) {
+      showNotification(`选择 Git 失败: ${err}`, 'error');
+    }
+  }, [refreshGitStatus, setSettings, showNotification]);
 
   const handleValidateToken = useCallback(async () => {
     setValidating('token');
@@ -111,14 +147,14 @@ export default function Settings() {
         setTokenValid(true);
         setUser(user);
         initOctokit(settings.githubToken);
-        showNotification(`验证成功！欢迎 ${user.name ?? user.login}`, 'success');
+        showNotification(`Token 验证成功，欢迎回来 ${user.name ?? user.login}`, 'success');
       } else {
         setTokenValid(false);
-        showNotification('Token 无效，请检查', 'error');
+        showNotification('Token 无效，请检查后重试', 'error');
       }
     } catch {
       setTokenValid(false);
-      showNotification('验证失败', 'error');
+      showNotification('Token 验证失败', 'error');
     } finally {
       setValidating(null);
     }
@@ -136,7 +172,7 @@ export default function Settings() {
       showNotification(valid ? 'API Key 验证成功' : 'API Key 无效', valid ? 'success' : 'error');
     } catch {
       setApiKeyValid(false);
-      showNotification('验证失败', 'error');
+      showNotification('API Key 验证失败', 'error');
     } finally {
       setValidating(null);
     }
@@ -160,7 +196,6 @@ export default function Settings() {
             </Button>
           </Stack>
 
-          {/* GitHub Token */}
           <Card sx={{ mb: 3 }}>
             <CardContent>
               <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
@@ -183,13 +218,13 @@ export default function Settings() {
                 InputProps={{
                   endAdornment: (
                     <InputAdornment position="end">
-                      <IconButton onClick={() => setShowToken(!showToken)} size="small">
+                      <IconButton onClick={() => setShowToken((v) => !v)} size="small">
                         {showToken ? <HideIcon /> : <ShowIcon />}
                       </IconButton>
                     </InputAdornment>
                   ),
                 }}
-                helperText="需要 repo, read:user 权限"
+                helperText="需要 repo、read:user 等权限"
               />
 
               <Button
@@ -203,13 +238,12 @@ export default function Settings() {
             </CardContent>
           </Card>
 
-          {/* OpenAI */}
           <Card sx={{ mb: 3 }}>
             <CardContent>
               <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
                 <AIIcon />
                 <Typography variant="h6" fontWeight={600}>
-                  LLM 配置 (OpenAI)
+                  LLM 配置（OpenAI）
                 </Typography>
                 {apiKeyValid === true && <Chip label="已连接" size="small" color="success" icon={<ValidIcon />} />}
                 {apiKeyValid === false && <Chip label="无效" size="small" color="error" icon={<InvalidIcon />} />}
@@ -226,7 +260,7 @@ export default function Settings() {
                 InputProps={{
                   endAdornment: (
                     <InputAdornment position="end">
-                      <IconButton onClick={() => setShowApiKey(!showApiKey)} size="small">
+                      <IconButton onClick={() => setShowApiKey((v) => !v)} size="small">
                         {showApiKey ? <HideIcon /> : <ShowIcon />}
                       </IconButton>
                     </InputAdornment>
@@ -241,21 +275,21 @@ export default function Settings() {
                 onChange={(e) => setSettings({ openaiBaseUrl: e.target.value })}
                 size="small"
                 sx={{ mb: 2 }}
-                helperText="默认 https://api.openai.com/v1，可替换为兼容 API"
+                helperText="默认使用 https://api.openai.com/v1，也可以改成兼容 OpenAI 的接口地址"
               />
 
               <Autocomplete
                 freeSolo
                 options={['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-3.5-turbo']}
                 value={settings.openaiModel}
-                onInputChange={(_, v) => setSettings({ openaiModel: v })}
+                onInputChange={(_, value) => setSettings({ openaiModel: value })}
                 size="small"
                 sx={{ minWidth: 280, mb: 2 }}
                 renderInput={(params) => (
                   <TextField
                     {...params}
                     label="模型"
-                    helperText="可选预设或手动输入自定义模型名称"
+                    helperText="可以选择预设模型，也可以手动输入自定义模型名"
                   />
                 )}
               />
@@ -273,7 +307,6 @@ export default function Settings() {
             </CardContent>
           </Card>
 
-          {/* Git */}
           <Card sx={{ mb: 3 }}>
             <CardContent>
               <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
@@ -282,39 +315,50 @@ export default function Settings() {
                   Git 配置
                 </Typography>
                 {gitAvailable === true && (
-                  <Chip label="已安装" size="small" color="success" icon={<ValidIcon />} />
+                  <Chip label="可用" size="small" color="success" icon={<ValidIcon />} />
                 )}
                 {gitAvailable === false && (
-                  <Chip label="未检测到" size="small" color="error" icon={<InvalidIcon />} />
+                  <Chip label="不可用" size="small" color="error" icon={<InvalidIcon />} />
                 )}
               </Stack>
 
               {gitAvailable && gitVersion && (
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                  版本: {gitVersion}
+                  版本：{gitVersion}
                 </Typography>
               )}
 
               {gitAvailable === false && (
-                <Alert severity="warning">
-                  系统未检测到 git。请安装 git 以使用 Fork/Clone/PR 功能。
+                <Alert severity="warning" sx={{ mb: 2 }}>
+                  当前没有检测到可用的 Git。请确认路径指向有效的 <code>git.exe</code>，或者清空后改用系统 PATH 中的 Git。
                 </Alert>
               )}
 
               <TextField
                 fullWidth
-                label="工作目录"
-                value={settings.workDirectory}
-                onChange={(e) => setSettings({ workDirectory: e.target.value })}
+                label="Git 可执行文件"
+                value={settings.gitPath}
+                onChange={(e) => setSettings({ gitPath: e.target.value })}
                 size="small"
-                sx={{ mt: 2 }}
-                placeholder="例如: C:\Projects\OpenSource"
-                helperText="Fork 的仓库将克隆到此目录"
+                placeholder="例如：C:\\Program Files\\Git\\cmd\\git.exe"
+                helperText="这里配置 Git 软件的位置；仓库工作目录请在“偏好设置”里配置"
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        onClick={handlePickGitExecutable}
+                        size="small"
+                        sx={{ color: 'primary.main' }}
+                      >
+                        <FolderIcon />
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
               />
             </CardContent>
           </Card>
 
-          {/* Data Management */}
           <Card>
             <CardContent>
               <Typography variant="h6" fontWeight={600} gutterBottom>
@@ -322,16 +366,16 @@ export default function Settings() {
               </Typography>
               <Divider sx={{ mb: 2 }} />
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                所有数据均存储在本地 SQLite 数据库中，不会上传至任何服务器。
+                所有数据都保存在本地 SQLite 数据库中，不会上传到任何第三方服务。
               </Typography>
               <Button
                 variant="outlined"
                 color="error"
                 startIcon={<ClearIcon />}
                 size="small"
-                onClick={() => showNotification('清除缓存功能即将推出', 'info')}
+                onClick={() => showNotification('清理缓存功能即将推出', 'info')}
               >
-                清除搜索缓存
+                清理搜索缓存
               </Button>
             </CardContent>
           </Card>

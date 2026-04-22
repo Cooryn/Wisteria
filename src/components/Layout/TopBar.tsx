@@ -4,6 +4,7 @@ import {
   Typography,
   IconButton,
   Tooltip,
+  Box,
   alpha,
 } from '@mui/material';
 import {
@@ -20,6 +21,7 @@ const PAGE_TITLES: Record<string, string> = {
   explorer: '探索项目',
   preferences: '偏好设置',
   settings: '应用设置',
+  'issue-detail': 'Issue 详情',
 };
 
 const THEME_CYCLE: ThemeMode[] = ['light', 'system', 'dark'];
@@ -41,10 +43,10 @@ function ThemeIcon({ mode }: { mode: ThemeMode }) {
 }
 
 export default function TopBar() {
-  const currentPage = useAppStore((s) => s.currentPage);
-  const themeMode = useAppStore((s) => s.themeMode);
-  const setThemeMode = useAppStore((s) => s.setThemeMode);
-  const user = useAppStore((s) => s.user);
+  const currentPage = useAppStore((state) => state.currentPage);
+  const themeMode = useAppStore((state) => state.themeMode);
+  const setThemeMode = useAppStore((state) => state.setThemeMode);
+  const user = useAppStore((state) => state.user);
 
   const handleCycleTheme = () => {
     const currentIndex = THEME_CYCLE.indexOf(themeMode);
@@ -62,41 +64,48 @@ export default function TopBar() {
       }}
     >
       <Toolbar sx={{ px: 3 }}>
-        {/* Page Title */}
-        <Typography
-          variant="h5"
-          color="text.primary"
-          fontWeight={700}
-          sx={{ flex: 1 }}
-        >
+        <Typography variant="h5" color="text.primary" fontWeight={700} sx={{ flex: 1 }}>
           {PAGE_TITLES[currentPage] ?? ''}
         </Typography>
 
-        {/* Theme Toggle — single cycling button */}
         <Tooltip title={THEME_LABELS[themeMode]}>
           <IconButton
             onClick={handleCycleTheme}
             size="small"
             sx={{
               mr: 2,
-              border: (theme) => `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
-              borderRadius: 2,
-              px: 1.2,
-              py: 0.6,
+              width: 38,
+              height: 38,
+              borderRadius: '50%',
+              border: (theme) => `1px solid ${alpha(theme.palette.primary.main, 0.22)}`,
               color: 'primary.main',
               backgroundColor: (theme) => alpha(theme.palette.primary.main, 0.08),
-              transition: 'all 0.25s ease',
+              transition: 'background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease',
               '&:hover': {
                 backgroundColor: (theme) => alpha(theme.palette.primary.main, 0.18),
-                transform: 'rotate(30deg)',
+                borderColor: (theme) => alpha(theme.palette.primary.main, 0.35),
+                boxShadow: (theme) => `0 0 0 4px ${alpha(theme.palette.primary.main, 0.08)}`,
+              },
+              '&:hover .theme-icon': {
+                transform: 'rotate(12deg) scale(1.05)',
               },
             }}
           >
-            <ThemeIcon mode={themeMode} />
+            <Box
+              className="theme-icon"
+              sx={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                lineHeight: 0,
+                transition: 'transform 0.2s ease',
+              }}
+            >
+              <ThemeIcon mode={themeMode} />
+            </Box>
           </IconButton>
         </Tooltip>
 
-        {/* GitHub link */}
         {user && (
           <Tooltip title={`@${user.login}`}>
             <IconButton

@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -14,7 +14,6 @@ import {
   Select,
   MenuItem,
   Slider,
-
   Fade,
   Divider,
 } from '@mui/material';
@@ -29,6 +28,15 @@ import RepoCard from '../components/RepoCard';
 import IssueCard from '../components/IssueCard';
 import type { Repo, Issue, ScoreResult } from '../types';
 
+function issueMatchesPreferredLabels(issue: Issue, preferredLabels: string[]): boolean {
+  if (preferredLabels.length === 0) {
+    return true;
+  }
+
+  const labelSet = new Set(preferredLabels.map((label) => label.toLowerCase()));
+  return issue.labels.some((label) => labelSet.has(label.name.toLowerCase()));
+}
+
 export default function Explorer() {
   const {
     languages,
@@ -40,6 +48,7 @@ export default function Explorer() {
     selectedRepo,
     setSelectedRepo,
     setSelectedIssue,
+    setIssueDetailBackPage,
     setCurrentPage,
     showNotification,
   } = useAppStore();
@@ -51,27 +60,38 @@ export default function Explorer() {
   const [loadingIssues, setLoadingIssues] = useState(false);
   const [sortBy, setSortBy] = useState<'score' | 'stars' | 'updated'>('score');
   const [languageFilter, setLanguageFilter] = useState('');
-  const [starsRange, setStarsRange] = useState<number[]>([minStars, maxStars > 50000 ? 50000 : maxStars]);
+  const [starsRange, setStarsRange] = useState<number[]>([
+    minStars,
+    maxStars > 50000 ? 50000 : maxStars,
+  ]);
 
-  const prefs = useMemo(() => ({
-    languages, frameworks, tools, minStars, maxStars, issueLabels,
-  }), [languages, frameworks, tools, minStars, maxStars, issueLabels]);
+  const prefs = useMemo(
+    () => ({
+      languages,
+      frameworks,
+      tools,
+      minStars,
+      maxStars,
+      issueLabels,
+    }),
+    [languages, frameworks, tools, minStars, maxStars, issueLabels]
+  );
 
   const handleSearch = useCallback(async () => {
     setLoadingRepos(true);
     try {
-      let query = searchQuery;
+      let query = searchQuery.trim();
       if (!query) {
         query = buildSearchQuery({
-          languages: languages.map((t) => t.name),
-          topics: [...frameworks, ...tools].map((t) => t.name),
+          languages: languages.map((tag) => tag.name),
+          topics: [...frameworks, ...tools].map((tag) => tag.name),
           minStars: starsRange[0],
           maxStars: starsRange[1],
         });
       }
 
-      if (languageFilter) {
-        query += ` language:${languageFilter}`;
+      if (languageFilter.trim()) {
+        query += ` language:${languageFilter.trim()}`;
       }
 
       const { items } = await searchRepositories(query, {
@@ -98,41 +118,96 @@ export default function Explorer() {
     } finally {
       setLoadingRepos(false);
     }
-  }, [searchQuery, languages, frameworks, tools, starsRange, languageFilter, sortBy, prefs, setSelectedRepo, showNotification]);
+  }, [
+    searchQuery,
+    languages,
+    frameworks,
+    tools,
+    starsRange,
+    languageFilter,
+    sortBy,
+    prefs,
+    setSelectedRepo,
+    showNotification,
+  ]);
 
-  const handleSelectRepo = useCallback(async (repo: Repo) => {
-    setSelectedRepo(repo);
-    setLoadingIssues(true);
-    try {
-      const repoIssues = await searchIssues(repo.full_name, {
-        labels: issueLabels.length > 0 ? issueLabels : undefined,
-        state: 'open',
-        perPage: 20,
-      });
+  const loadIssuesForRepo = useCallback(
+    async (repo: Repo) => {
+      setLoadingIssues(true);
+      setIssues([]);
 
-      const scored = repoIssues
-        .map((issue) => ({
-          issue: { ...issue, repo_full_name: repo.full_name },
-          score: scoreIssue(issue, issueLabels),
-        }))
-        .sort((a, b) => b.score - a.score);
+      try {
+        const repoIssues = await searchIssues(repo.full_name, {
+          state: 'open',
+          perPage: 50,
+        });
 
-      setIssues(scored);
-    } catch (err) {
-      showNotification(`加载 Issue 失败: ${err}`, 'error');
-    } finally {
+        const scored = repoIssues
+          .map((issue) => {
+            const issueWithRepo = { ...issue, repo_full_name: repo.full_name };
+            return {
+              issue: issueWithRepo,
+              score: scoreIssue(issueWithRepo, issueLabels),
+            };
+          })
+          .sort((a, b) => b.score - a.score);
+
+        if (issueLabels.length === 0) {
+          setIssues(scored);
+          return;
+        }
+
+        const matched = scored.filter(({ issue }) =>
+          issueMatchesPreferredLabels(issue, issueLabels)
+        );
+
+        if (matched.length > 0) {
+          setIssues(matched);
+          return;
+        }
+
+        setIssues(scored);
+        if (scored.length > 0) {
+          showNotification(
+            '这个仓库没有命中你偏好标签的 Issue，先为你展示最近更新的开放 Issue',
+            'info'
+          );
+        }
+      } catch (err) {
+        setIssues([]);
+        showNotification(`加载 Issue 失败: ${err}`, 'error');
+      } finally {
+        setLoadingIssues(false);
+      }
+    },
+    [issueLabels, showNotification]
+  );
+
+  useEffect(() => {
+    if (!selectedRepo) {
+      setIssues([]);
       setLoadingIssues(false);
+      return;
     }
-  }, [issueLabels, setSelectedRepo, showNotification]);
+
+    void loadIssuesForRepo(selectedRepo);
+  }, [selectedRepo, loadIssuesForRepo]);
+
+  const handleSelectRepo = useCallback(
+    (repo: Repo) => {
+      setLoadingIssues(true);
+      setSelectedRepo(repo);
+    },
+    [setSelectedRepo]
+  );
 
   return (
     <Box sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      {/* Search Bar */}
       <Box sx={{ mb: 3 }}>
         <Stack direction="row" spacing={2} alignItems="center">
           <TextField
             fullWidth
-            placeholder="搜索 GitHub 项目（留空使用偏好自动搜索）"
+            placeholder="搜索 GitHub 项目，留空则按偏好自动搜索"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
@@ -155,22 +230,21 @@ export default function Explorer() {
           </Button>
         </Stack>
 
-        {/* Filters */}
         <Stack direction="row" spacing={2} alignItems="center" sx={{ mt: 2 }}>
           <FilterIcon sx={{ color: 'text.secondary', fontSize: 20 }} />
 
           <FormControl size="small" sx={{ minWidth: 120 }}>
             <InputLabel>排序方式</InputLabel>
-            <Select value={sortBy} onChange={(e) => setSortBy(e.target.value as any)} label="排序方式">
+            <Select value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)} label="排序方式">
               <MenuItem value="score">匹配度</MenuItem>
-              <MenuItem value="stars">星标数</MenuItem>
+              <MenuItem value="stars">Star 数</MenuItem>
               <MenuItem value="updated">最近更新</MenuItem>
             </Select>
           </FormControl>
 
           <TextField
             size="small"
-            placeholder="语言筛选"
+            placeholder="语言过滤"
             value={languageFilter}
             onChange={(e) => setLanguageFilter(e.target.value)}
             sx={{ width: 140 }}
@@ -178,25 +252,23 @@ export default function Explorer() {
 
           <Box sx={{ width: 200 }}>
             <Typography variant="caption" color="text.secondary">
-              星标: {starsRange[0].toLocaleString()} - {starsRange[1].toLocaleString()}
+              Star: {starsRange[0].toLocaleString()} - {starsRange[1].toLocaleString()}
             </Typography>
             <Slider
               value={starsRange}
-              onChange={(_, v) => setStarsRange(v as number[])}
+              onChange={(_, value) => setStarsRange(value as number[])}
               min={0}
               max={50000}
               step={100}
               size="small"
               valueLabelDisplay="auto"
-              valueLabelFormat={(v) => `${(v / 1000).toFixed(1)}k`}
+              valueLabelFormat={(value) => `${(value / 1000).toFixed(1)}k`}
             />
           </Box>
         </Stack>
       </Box>
 
-      {/* Content: Two-column layout */}
       <Box sx={{ flex: 1, display: 'flex', gap: 3, overflow: 'hidden' }}>
-        {/* Left: Repos */}
         <Box
           sx={{
             flex: selectedRepo ? '0 0 45%' : '1',
@@ -215,11 +287,7 @@ export default function Explorer() {
                 <Grid size={{ xs: 12, sm: selectedRepo ? 12 : 6, md: selectedRepo ? 12 : 4 }} key={repo.id}>
                   <Fade in timeout={400}>
                     <Box>
-                      <RepoCard
-                        repo={repo}
-                        score={score}
-                        onClick={() => handleSelectRepo(repo)}
-                      />
+                      <RepoCard repo={repo} score={score} onClick={() => handleSelectRepo(repo)} />
                     </Box>
                   </Fade>
                 </Grid>
@@ -239,13 +307,12 @@ export default function Explorer() {
               <SearchIcon sx={{ fontSize: 64, mb: 2 }} />
               <Typography variant="h6">开始搜索项目</Typography>
               <Typography variant="body2" color="text.secondary">
-                输入关键词或使用偏好自动搜索
+                输入关键词，或者直接使用你的偏好自动筛选
               </Typography>
             </Box>
           )}
         </Box>
 
-        {/* Right: Issues panel */}
         {selectedRepo && (
           <Fade in timeout={400}>
             <Box
@@ -289,15 +356,16 @@ export default function Explorer() {
                     score={score}
                     onClick={() => {
                       setSelectedIssue(issue);
+                      setIssueDetailBackPage('explorer');
                       setCurrentPage('issue-detail');
                     }}
                   />
                 ))
               ) : (
                 <Box sx={{ textAlign: 'center', py: 4, opacity: 0.5 }}>
-                  <Typography>暂无匹配的 Issue</Typography>
+                  <Typography>暂无可用的 Issue</Typography>
                   <Typography variant="caption" color="text.secondary">
-                    试试调整偏好中的标签过滤
+                    这个仓库当前没有获取到开放 Issue，或者 GitHub 暂时没有返回结果
                   </Typography>
                 </Box>
               )}

@@ -93,17 +93,60 @@ export async function deleteSavedRepo(githubId: number): Promise<void> {
 export async function getSavedIssues(): Promise<SavedIssue[]> {
   const d = await getDb();
   return d.select<SavedIssue[]>(
-    'SELECT * FROM saved_issues ORDER BY score DESC, saved_at DESC'
+    'SELECT * FROM saved_issues ORDER BY saved_at DESC'
   );
+}
+
+export async function getSavedIssueByGitHubId(githubId: number): Promise<SavedIssue | null> {
+  const d = await getDb();
+  const rows = await d.select<SavedIssue[]>(
+    'SELECT * FROM saved_issues WHERE github_id = $1 LIMIT 1',
+    [githubId]
+  );
+  return rows[0] ?? null;
 }
 
 export async function saveIssue(issue: SavedIssue): Promise<void> {
   const d = await getDb();
   await d.execute(
-    `INSERT INTO saved_issues (github_id, repo_full_name, title, body, labels, state, score, analysis)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-     ON CONFLICT(github_id) DO UPDATE SET score = excluded.score, analysis = excluded.analysis`,
-    [issue.github_id, issue.repo_full_name, issue.title, issue.body, issue.labels, issue.state, issue.score, issue.analysis]
+    `INSERT INTO saved_issues (
+       github_id, repo_full_name, issue_number, title, body, labels, state,
+       html_url, comments, user_login, user_avatar_url, created_at, updated_at,
+       score, analysis
+     )
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+     ON CONFLICT(github_id) DO UPDATE SET
+       repo_full_name = excluded.repo_full_name,
+       issue_number = excluded.issue_number,
+       title = excluded.title,
+       body = excluded.body,
+       labels = excluded.labels,
+       state = excluded.state,
+       html_url = excluded.html_url,
+       comments = excluded.comments,
+       user_login = excluded.user_login,
+       user_avatar_url = excluded.user_avatar_url,
+       created_at = excluded.created_at,
+       updated_at = excluded.updated_at,
+       score = excluded.score,
+       analysis = excluded.analysis`,
+    [
+      issue.github_id,
+      issue.repo_full_name,
+      issue.issue_number,
+      issue.title,
+      issue.body,
+      issue.labels,
+      issue.state,
+      issue.html_url,
+      issue.comments,
+      issue.user_login,
+      issue.user_avatar_url,
+      issue.created_at,
+      issue.updated_at,
+      issue.score,
+      issue.analysis,
+    ]
   );
 }
 

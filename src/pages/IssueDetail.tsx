@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -26,12 +26,25 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useAppStore } from '../store';
 import { analyzeIssue } from '../services/llm';
-import { saveIssue } from '../services/database';
+import { getSavedIssueByGitHubId, saveIssue } from '../services/database';
 import type { IssueAnalysis } from '../types';
+
+function parseSavedAnalysis(value: string | null): IssueAnalysis | null {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(value) as IssueAnalysis;
+  } catch {
+    return null;
+  }
+}
 
 export default function IssueDetail() {
   const {
     selectedIssue,
+    issueDetailBackPage,
     setCurrentPage,
     settings,
     showNotification,
@@ -41,7 +54,39 @@ export default function IssueDetail() {
   const [analyzing, setAnalyzing] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  const handleBack = () => setCurrentPage('explorer');
+  const handleBack = () => setCurrentPage(issueDetailBackPage);
+
+  useEffect(() => {
+    let isActive = true;
+
+    setSaved(false);
+    setAnalysis(null);
+
+    if (!selectedIssue) {
+      return () => {
+        isActive = false;
+      };
+    }
+
+    const loadSavedState = async () => {
+      const existing = await getSavedIssueByGitHubId(selectedIssue.id);
+      if (!isActive || !existing) {
+        return;
+      }
+
+      setSaved(true);
+      const parsedAnalysis = parseSavedAnalysis(existing.analysis);
+      if (parsedAnalysis) {
+        setAnalysis(parsedAnalysis);
+      }
+    };
+
+    void loadSavedState();
+
+    return () => {
+      isActive = false;
+    };
+  }, [selectedIssue]);
 
   const handleAnalyze = useCallback(async () => {
     if (!selectedIssue) return;
@@ -69,16 +114,24 @@ export default function IssueDetail() {
   }, [selectedIssue, settings, showNotification]);
 
   const handleSave = useCallback(async () => {
-    if (!selectedIssue) return;
+    if (!selectedIssue || saved) return;
+
     try {
       await saveIssue({
         id: 0,
         github_id: selectedIssue.id,
         repo_full_name: selectedIssue.repo_full_name ?? '',
+        issue_number: selectedIssue.number,
         title: selectedIssue.title,
         body: selectedIssue.body,
         labels: JSON.stringify(selectedIssue.labels),
         state: selectedIssue.state,
+        html_url: selectedIssue.html_url,
+        comments: selectedIssue.comments,
+        user_login: selectedIssue.user.login,
+        user_avatar_url: selectedIssue.user.avatar_url,
+        created_at: selectedIssue.created_at,
+        updated_at: selectedIssue.updated_at,
         score: null,
         analysis: analysis ? JSON.stringify(analysis) : null,
         saved_at: new Date().toISOString(),
@@ -88,7 +141,7 @@ export default function IssueDetail() {
     } catch (err) {
       showNotification(`收藏失败: ${err}`, 'error');
     }
-  }, [selectedIssue, analysis, showNotification]);
+  }, [analysis, saved, selectedIssue, showNotification]);
 
   const handleStartContribution = () => {
     showNotification('Draft PR 流程即将推出', 'info');
@@ -98,10 +151,10 @@ export default function IssueDetail() {
     return (
       <Box sx={{ p: 3 }}>
         <Button startIcon={<BackIcon />} onClick={handleBack}>
-          返回探索
+          返回
         </Button>
         <Typography sx={{ mt: 4, textAlign: 'center' }}>
-          未选择 Issue
+          当前没有选中的 Issue
         </Typography>
       </Box>
     );
@@ -123,7 +176,6 @@ export default function IssueDetail() {
     <Box sx={{ p: 3, height: '100%', overflow: 'auto' }}>
       <Fade in timeout={400}>
         <Box>
-          {/* Back + Actions */}
           <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 3 }}>
             <Button startIcon={<BackIcon />} onClick={handleBack}>
               返回
@@ -146,17 +198,12 @@ export default function IssueDetail() {
               >
                 {analyzing ? <CircularProgress size={18} /> : 'AI 分析'}
               </Button>
-              <Button
-                variant="contained"
-                startIcon={<StartIcon />}
-                onClick={handleStartContribution}
-              >
+              <Button variant="contained" startIcon={<StartIcon />} onClick={handleStartContribution}>
                 开始贡献
               </Button>
             </Stack>
           </Stack>
 
-          {/* Issue Header */}
           <Card sx={{ mb: 3 }}>
             <CardContent>
               <Typography variant="h5" fontWeight={700} gutterBottom>
@@ -172,7 +219,7 @@ export default function IssueDetail() {
               <Stack direction="row" spacing={1} sx={{ mb: 2, flexWrap: 'wrap', gap: 0.5 }}>
                 {selectedIssue.labels.map((label) => (
                   <Chip
-                    key={label.id}
+                    key={`${label.id}-${label.name}`}
                     label={label.name}
                     size="small"
                     sx={{
@@ -195,19 +242,20 @@ export default function IssueDetail() {
                 <Typography variant="caption">
                   作者: <strong>{selectedIssue.user.login}</strong>
                 </Typography>
-                <IconButton
-                  size="small"
-                  onClick={() => window.open(selectedIssue.html_url, '_blank')}
-                  sx={{ ml: 'auto' }}
-                >
-                  <OpenIcon fontSize="small" />
-                </IconButton>
+                {selectedIssue.html_url && (
+                  <IconButton
+                    size="small"
+                    onClick={() => window.open(selectedIssue.html_url, '_blank')}
+                    sx={{ ml: 'auto' }}
+                  >
+                    <OpenIcon fontSize="small" />
+                  </IconButton>
+                )}
               </Stack>
             </CardContent>
           </Card>
 
           <Box sx={{ display: 'flex', gap: 3 }}>
-            {/* Issue Body (Markdown) */}
             <Card sx={{ flex: 1 }}>
               <CardContent>
                 <Typography variant="h6" fontWeight={600} gutterBottom>
@@ -257,7 +305,6 @@ export default function IssueDetail() {
               </CardContent>
             </Card>
 
-            {/* AI Analysis Panel */}
             <Box sx={{ width: 320, flexShrink: 0 }}>
               <Card>
                 <CardContent>
@@ -276,11 +323,9 @@ export default function IssueDetail() {
                   {!analysis && !analyzing && (
                     <Box sx={{ textAlign: 'center', py: 3, opacity: 0.5 }}>
                       <AIIcon sx={{ fontSize: 40, mb: 1 }} />
-                      <Typography variant="body2">
-                        点击「AI 分析」按钮获取
-                      </Typography>
+                      <Typography variant="body2">点击“AI 分析”获取建议</Typography>
                       <Typography variant="caption" color="text.secondary">
-                        智能评估难度和推荐解法
+                        这里会评估难度、时间预估和建议做法
                       </Typography>
                     </Box>
                   )}
@@ -288,7 +333,6 @@ export default function IssueDetail() {
                   {analysis && (
                     <Fade in timeout={500}>
                       <Box>
-                        {/* Difficulty */}
                         <Box sx={{ mb: 2 }}>
                           <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
                             <DifficultyIcon sx={{ fontSize: 18, color: difficultyColors[analysis.difficulty] }} />
@@ -305,59 +349,50 @@ export default function IssueDetail() {
                           />
                         </Box>
 
-                        {/* Time estimate */}
                         <Box sx={{ mb: 2 }}>
                           <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
                             <TimeIcon sx={{ fontSize: 18, color: 'text.secondary' }} />
-                            <Typography variant="subtitle2">预估时间</Typography>
+                            <Typography variant="subtitle2">预计时间</Typography>
                           </Stack>
                           <Typography variant="body2" color="text.secondary">
                             {analysis.estimatedTime}
                           </Typography>
                         </Box>
 
-                        {/* Approach */}
                         <Box sx={{ mb: 2 }}>
                           <Typography variant="subtitle2" gutterBottom>
                             建议方向
                           </Typography>
-                          <Typography
-                            variant="body2"
-                            color="text.secondary"
-                            sx={{ lineHeight: 1.7 }}
-                          >
+                          <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.7 }}>
                             {analysis.suggestedApproach}
                           </Typography>
                         </Box>
 
-                        {/* Related files */}
                         {analysis.relatedFiles.length > 0 && (
                           <Box sx={{ mb: 2 }}>
                             <Typography variant="subtitle2" gutterBottom>
                               可能涉及文件
                             </Typography>
                             <Stack spacing={0.5}>
-                              {analysis.relatedFiles.map((f) => (
+                              {analysis.relatedFiles.map((file) => (
                                 <Typography
-                                  key={f}
+                                  key={file}
                                   variant="caption"
                                   sx={{
                                     fontFamily: 'monospace',
-                                    backgroundColor: (theme) =>
-                                      alpha(theme.palette.primary.main, 0.06),
+                                    backgroundColor: (theme) => alpha(theme.palette.primary.main, 0.06),
                                     px: 1,
                                     py: 0.5,
                                     borderRadius: 1,
                                   }}
                                 >
-                                  {f}
+                                  {file}
                                 </Typography>
                               ))}
                             </Stack>
                           </Box>
                         )}
 
-                        {/* Tags */}
                         {analysis.tags.length > 0 && (
                           <Box>
                             <Typography variant="subtitle2" gutterBottom>

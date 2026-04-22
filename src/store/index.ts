@@ -23,6 +23,8 @@ interface AppState {
   // Navigation
   currentPage: string;
   setCurrentPage: (page: string) => void;
+  issueDetailBackPage: string;
+  setIssueDetailBackPage: (page: string) => void;
 
   // Sidebar
   sidebarCollapsed: boolean;
@@ -71,6 +73,8 @@ interface AppState {
   setSettings: (settings: Partial<AppSettings>) => void;
 
   // Loading states
+  isHydrated: boolean;
+  setIsHydrated: (val: boolean) => void;
   isLoading: boolean;
   setIsLoading: (val: boolean) => void;
   loadingMessage: string;
@@ -94,6 +98,8 @@ export const useAppStore = create<AppState>((set) => ({
   // Navigation
   currentPage: 'dashboard',
   setCurrentPage: (page) => set({ currentPage: page }),
+  issueDetailBackPage: 'explorer',
+  setIssueDetailBackPage: (page) => set({ issueDetailBackPage: page }),
 
   // Sidebar
   sidebarCollapsed: false,
@@ -142,12 +148,14 @@ export const useAppStore = create<AppState>((set) => ({
     openaiModel: 'gpt-4o',
     openaiBaseUrl: 'https://api.openai.com/v1',
     themeMode: 'system',
-    workDirectory: '',
+    gitPath: '',
   },
   setSettings: (partial) =>
     set((s) => ({ settings: { ...s.settings, ...partial } })),
 
   // Loading
+  isHydrated: false,
+  setIsHydrated: (val) => set({ isHydrated: val }),
   isLoading: false,
   setIsLoading: (val) => set({ isLoading: val }),
   loadingMessage: '',

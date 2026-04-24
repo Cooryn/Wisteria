@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 
-export interface LocalPathInfo {
+interface LocalPathInfo {
   exists: boolean;
   isDir: boolean;
 }

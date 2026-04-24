@@ -30,28 +30,6 @@ export async function analyzeIssue(
   });
 }
 
-// ---- Generate PR description ----
-export async function generatePRDescription(
-  config: LLMConfig,
-  issue: Issue,
-  branchName: string
-): Promise<string> {
-  return invoke<string>('llm_generate_pr_description', {
-    config: {
-      apiKey: config.apiKey,
-      model: config.model,
-      baseUrl: config.baseUrl,
-    },
-    issue: {
-      number: issue.number,
-      title: issue.title,
-      body: issue.body,
-      labels: issue.labels.map((l) => l.name),
-    },
-    branchName,
-  });
-}
-
 // ---- Validate API Key ----
 export async function validateOpenAIKey(config: LLMConfig): Promise<boolean> {
   return invoke<boolean>('llm_validate_key', {

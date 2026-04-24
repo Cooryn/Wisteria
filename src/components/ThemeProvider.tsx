@@ -31,7 +31,7 @@ function useSystemTheme(): 'light' | 'dark' {
   return systemTheme;
 }
 
-export function resolveTheme(mode: ThemeMode, systemTheme: 'light' | 'dark'): 'light' | 'dark' {
+function resolveTheme(mode: ThemeMode, systemTheme: 'light' | 'dark'): 'light' | 'dark' {
   if (mode === 'system') return systemTheme;
   return mode;
 }

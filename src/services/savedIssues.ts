@@ -16,7 +16,7 @@ function normalizeLabel(raw: unknown, index: number): IssueLabel | null {
   };
 }
 
-export function parseSavedIssueLabels(labels: string): IssueLabel[] {
+function parseSavedIssueLabels(labels: string): IssueLabel[] {
   try {
     const parsed = JSON.parse(labels);
     if (!Array.isArray(parsed)) {

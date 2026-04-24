@@ -12,7 +12,7 @@ export function initOctokit(token: string): Octokit {
   return octokitInstance;
 }
 
-export function getOctokit(): Octokit {
+function getOctokit(): Octokit {
   if (!octokitInstance) {
     // Create unauthenticated instance for public searches
     octokitInstance = new Octokit();
@@ -170,43 +170,8 @@ export async function searchIssues(
 }
 
 // ---- Get single issue ----
-export async function getIssueDetail(
-  owner: string,
-  repo: string,
-  issueNumber: number
-): Promise<Issue> {
-  const ok = getOctokit();
-  const { data } = await ok.rest.issues.get({ owner, repo, issue_number: issueNumber });
-
-  return {
-    id: data.id,
-    number: data.number,
-    title: data.title,
-    body: data.body ?? null,
-    state: data.state ?? 'open',
-    labels: (data.labels ?? [])
-      .filter((l): l is { id?: number; name?: string; color?: string; description?: string | null } =>
-        typeof l === 'object'
-      )
-      .map((l) => ({
-        id: l.id ?? 0,
-        name: l.name ?? '',
-        color: l.color ?? '000000',
-        description: l.description ?? null,
-      })),
-    html_url: data.html_url,
-    created_at: data.created_at,
-    updated_at: data.updated_at ?? data.created_at,
-    comments: data.comments ?? 0,
-    user: {
-      login: data.user?.login ?? '',
-      avatar_url: data.user?.avatar_url ?? '',
-    },
-  };
-}
-
 // ---- Fork a repository ----
-export async function forkRepository(
+async function forkRepository(
   owner: string,
   repo: string
 ): Promise<{ full_name: string; html_url: string }> {

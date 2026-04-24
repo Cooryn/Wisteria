@@ -9,10 +9,6 @@ import type {
 
 // ---- App Settings ----
 
-export async function getSetting(key: string): Promise<string | null> {
-  return invoke<string | null>('db_get_setting', { key });
-}
-
 export async function setSetting(key: string, value: string): Promise<void> {
   return invoke<void>('db_set_setting', { key, value });
 }
@@ -35,10 +31,6 @@ export async function saveTechTag(tag: TechTag): Promise<void> {
   });
 }
 
-export async function deleteTechTag(name: string): Promise<void> {
-  return invoke<void>('db_delete_tech_tag', { name });
-}
-
 export async function clearTechTags(): Promise<void> {
   return invoke<void>('db_clear_tech_tags');
 }
@@ -47,24 +39,6 @@ export async function clearTechTags(): Promise<void> {
 
 export async function getSavedRepos(): Promise<SavedRepo[]> {
   return invoke<SavedRepo[]>('db_get_saved_repos');
-}
-
-export async function saveRepo(repo: SavedRepo): Promise<void> {
-  return invoke<void>('db_save_repo', {
-    repo: {
-      githubId: repo.github_id,
-      fullName: repo.full_name,
-      description: repo.description,
-      language: repo.language,
-      stars: repo.stars,
-      topics: repo.topics,
-      score: repo.score,
-    },
-  });
-}
-
-export async function deleteSavedRepo(githubId: number): Promise<void> {
-  return invoke<void>('db_delete_saved_repo', { githubId });
 }
 
 // ---- Saved Issues ----
@@ -97,10 +71,6 @@ export async function saveIssue(issue: SavedIssue): Promise<void> {
       analysis: issue.analysis,
     },
   });
-}
-
-export async function deleteSavedIssue(githubId: number): Promise<void> {
-  return invoke<void>('db_delete_saved_issue', { githubId });
 }
 
 // ---- PR History ----
@@ -150,10 +120,6 @@ export async function updateContributionSessionDraftPR(
   prUrl: string
 ): Promise<void> {
   return invoke<void>('db_update_contribution_session_pr', { issueGithubId: issueGitHubId, prUrl });
-}
-
-export async function deleteContributionSession(issueGitHubId: number): Promise<void> {
-  return invoke<void>('db_delete_contribution_session', { issueGithubId: issueGitHubId });
 }
 
 // ---- Preferences (simple key-value) ----

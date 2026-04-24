@@ -140,17 +140,6 @@ export interface ScoreResult {
   recommendation: string;
 }
 
-// ---- Preferences ----
-export interface UserPreferences {
-  languages: TechTag[];
-  frameworks: TechTag[];
-  tools: TechTag[];
-  minStars: number;
-  maxStars: number;
-  issueLabels: string[]; // e.g. ['good first issue', 'help wanted']
-  workDirectory: string; // user-defined clone directory
-}
-
 // ---- Issue Analysis (LLM) ----
 export interface IssueAnalysis {
   difficulty: 'easy' | 'medium' | 'hard';
@@ -179,21 +168,6 @@ export interface GitHubUser {
   public_repos: number;
   followers: number;
   html_url: string;
-}
-
-// ---- Draft PR ----
-export interface DraftPRRequest {
-  issue: Issue;
-  repoFullName: string;
-  branchName: string;
-  title: string;
-  body: string;
-}
-
-export interface DraftPRResult {
-  success: boolean;
-  pr_url?: string;
-  error?: string;
 }
 
 export interface ContributionProgressStep {

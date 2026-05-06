@@ -15,6 +15,11 @@ import {
   InputAdornment,
   IconButton,
   Autocomplete,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
 } from '@mui/material';
 import {
   Save as SaveIcon,
@@ -30,14 +35,22 @@ import {
 } from '@mui/icons-material';
 import { open } from '@tauri-apps/plugin-dialog';
 import { useAppStore } from '../store';
-import { setSetting, getAllSettings } from '../services/database';
+import { setSetting, getAllSettings, clearSavedRepos } from '../services/database';
 import { validateToken, initOctokit } from '../services/github';
 import { validateOpenAIKey } from '../services/llm';
 import { isGitAvailable, getGitVersion } from '../services/git';
 import type { ThemeMode } from '../types';
 
 export default function Settings() {
-  const { settings, setSettings, setUser, showNotification } = useAppStore();
+  const {
+    settings,
+    setSettings,
+    setUser,
+    showNotification,
+    setSearchRepos,
+    setSearchIssues,
+    setRepoScores,
+  } = useAppStore();
 
   const [showToken, setShowToken] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
@@ -47,6 +60,8 @@ export default function Settings() {
   const [gitVersion, setGitVersion] = useState('');
   const [saving, setSaving] = useState(false);
   const [validating, setValidating] = useState<string | null>(null);
+  const [clearDialogOpen, setClearDialogOpen] = useState(false);
+  const [clearing, setClearing] = useState(false);
 
   const refreshGitStatus = useCallback(async (gitPath?: string) => {
     try {
@@ -159,6 +174,22 @@ export default function Settings() {
       setValidating(null);
     }
   }, [settings.githubToken, setUser, showNotification]);
+
+  const handleClearCache = useCallback(async () => {
+    setClearing(true);
+    try {
+      await clearSavedRepos();
+      setSearchRepos([]);
+      setSearchIssues([]);
+      setRepoScores(new Map());
+      setClearDialogOpen(false);
+      showNotification('搜索缓存已清理', 'success');
+    } catch (err) {
+      showNotification(`清理失败: ${err}`, 'error');
+    } finally {
+      setClearing(false);
+    }
+  }, [setSearchRepos, setSearchIssues, setRepoScores, showNotification]);
 
   const handleValidateApiKey = useCallback(async () => {
     setValidating('apikey');
@@ -373,12 +404,36 @@ export default function Settings() {
                 color="error"
                 startIcon={<ClearIcon />}
                 size="small"
-                onClick={() => showNotification('清理缓存功能即将推出', 'info')}
+                onClick={() => setClearDialogOpen(true)}
               >
                 清理搜索缓存
               </Button>
             </CardContent>
           </Card>
+
+          {/* Confirmation Dialog */}
+          <Dialog open={clearDialogOpen} onClose={() => setClearDialogOpen(false)}>
+            <DialogTitle>确认清理搜索缓存？</DialogTitle>
+            <DialogContent>
+              <DialogContentText>
+                此操作将删除本地数据库中所有已缓存的仓库搜索结果，同时清空内存中的搜索状态。该操作不可恢复。
+              </DialogContentText>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setClearDialogOpen(false)} disabled={clearing}>
+                取消
+              </Button>
+              <Button
+                onClick={handleClearCache}
+                color="error"
+                variant="contained"
+                disabled={clearing}
+                startIcon={clearing ? <CircularProgress size={16} color="inherit" /> : null}
+              >
+                {clearing ? '清理中…' : '确认清理'}
+              </Button>
+            </DialogActions>
+          </Dialog>
         </Box>
       </Fade>
     </Box>

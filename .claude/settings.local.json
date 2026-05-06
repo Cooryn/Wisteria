@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\mcrle\\\\Documents\\\\Coding\\\\repo\\\\Wisteria\" -Force | Select-Object -Property Name, @{Name='Type'; Expression={if\\($_.PSIsContainer\\){'Directory'}else{'File'}}} | Format-Table -AutoSize)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\mcrle\\\\Documents\\\\Coding\\\\repo\\\\Wisteria\\\\src\" -Recurse | Select-Object -Property FullName | ForEach-Object { $_.FullName.Replace\\(\"C:\\\\Users\\\\mcrle\\\\Documents\\\\Coding\\\\repo\\\\Wisteria\\\\\", \"\"\\) })"
+    ]
+  }
+}

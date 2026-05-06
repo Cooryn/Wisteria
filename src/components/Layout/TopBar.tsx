@@ -14,6 +14,7 @@ import {
   GitHub as GitHubIcon,
 } from '@mui/icons-material';
 import { useAppStore } from '../../store';
+import { setSetting } from '../../services/database';
 import type { ThemeMode } from '../../types';
 
 const PAGE_TITLES: Record<string, string> = {
@@ -51,7 +52,11 @@ export default function TopBar() {
   const handleCycleTheme = () => {
     const currentIndex = THEME_CYCLE.indexOf(themeMode);
     const nextIndex = (currentIndex + 1) % THEME_CYCLE.length;
-    setThemeMode(THEME_CYCLE[nextIndex]);
+    const nextMode = THEME_CYCLE[nextIndex];
+    setThemeMode(nextMode);
+    setSetting('themeMode', nextMode).catch(() => {
+      // 持久化失败静默处理；内存状态已更新，UI 不受影响
+    });
   };
 
   return (

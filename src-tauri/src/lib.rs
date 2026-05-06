@@ -63,6 +63,7 @@ pub fn run() {
             db::repos::db_get_saved_repos,
             db::repos::db_save_repo,
             db::repos::db_delete_saved_repo,
+            db::repos::db_clear_saved_repos,
             // Database — saved issues
             db::issues::db_get_saved_issues,
             db::issues::db_get_saved_issue_by_github_id,

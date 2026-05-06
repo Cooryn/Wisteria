@@ -93,3 +93,11 @@ pub fn db_delete_saved_repo(db: State<'_, Database>, github_id: i64) -> Result<(
     .map_err(|e| e.to_string())?;
     Ok(())
 }
+
+#[tauri::command]
+pub fn db_clear_saved_repos(db: State<'_, Database>) -> Result<(), String> {
+    let conn = db.conn();
+    conn.execute("DELETE FROM saved_repos", [])
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}

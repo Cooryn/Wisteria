@@ -41,6 +41,10 @@ export async function getSavedRepos(): Promise<SavedRepo[]> {
   return invoke<SavedRepo[]>('db_get_saved_repos');
 }
 
+export async function clearSavedRepos(): Promise<void> {
+  return invoke<void>('db_clear_saved_repos');
+}
+
 // ---- Saved Issues ----
 
 export async function getSavedIssues(): Promise<SavedIssue[]> {

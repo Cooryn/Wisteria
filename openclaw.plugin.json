@@ -1,0 +1,139 @@
+{
+  "id": "wisteria-claw",
+  "name": "Wisteria Claw",
+  "description": "Open source contribution assistant for discovering GitHub repositories, analyzing issues, preparing contribution workspaces, and creating draft PRs.",
+  "version": "0.1.0",
+  "skills": [
+    "skills"
+  ],
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "githubToken"
+    ],
+    "properties": {
+      "githubToken": {
+        "type": "string",
+        "minLength": 1,
+        "description": "GitHub personal access token used for repository search, fork, branch push, and draft pull request creation."
+      },
+      "defaultWorkDir": {
+        "type": "string",
+        "description": "Default local directory where repositories are cloned."
+      },
+      "defaultLanguages": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Default programming languages used for repository discovery."
+      },
+      "defaultTopics": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Default GitHub topics or frameworks used for repository discovery."
+      },
+      "defaultLabels": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "default": [
+          "good first issue",
+          "help wanted"
+        ],
+        "description": "Default issue labels used for issue discovery."
+      },
+      "minStars": {
+        "type": "number",
+        "minimum": 0,
+        "description": "Minimum repository stars."
+      },
+      "maxStars": {
+        "type": "number",
+        "minimum": 0,
+        "description": "Maximum repository stars."
+      },
+      "allowGitCommands": {
+        "type": "boolean",
+        "default": false,
+        "description": "Whether tools that execute local git commands may run."
+      },
+      "dailyDigest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "default": false
+          },
+          "timezone": {
+            "type": "string",
+            "default": "Asia/Tokyo"
+          },
+          "hour": {
+            "type": "number",
+            "default": 9,
+            "minimum": 0,
+            "maximum": 23
+          },
+          "limit": {
+            "type": "number",
+            "default": 5,
+            "minimum": 1,
+            "maximum": 20
+          },
+          "minScore": {
+            "type": "number",
+            "default": 60,
+            "minimum": 0,
+            "maximum": 100
+          }
+        }
+      }
+    }
+  },
+  "uiHints": {
+    "githubToken": {
+      "label": "GitHub Token",
+      "sensitive": true
+    },
+    "defaultWorkDir": {
+      "label": "Default working directory",
+      "placeholder": "~/code/open-source"
+    },
+    "allowGitCommands": {
+      "label": "Allow local Git commands"
+    },
+    "dailyDigest": {
+      "label": "Daily Issue Digest"
+    }
+  },
+  "contracts": {
+    "tools": [
+      "wisteria_search_repos",
+      "wisteria_search_issues",
+      "wisteria_score_repo",
+      "wisteria_score_issue",
+      "wisteria_get_issue_context",
+      "wisteria_daily_issue_digest",
+      "wisteria_prepare_contribution",
+      "wisteria_check_workspace",
+      "wisteria_create_draft_pr"
+    ]
+  },
+  "toolMetadata": {
+    "wisteria_prepare_contribution": {
+      "optional": true
+    },
+    "wisteria_check_workspace": {
+      "optional": true
+    },
+    "wisteria_create_draft_pr": {
+      "optional": true
+    }
+  }
+}

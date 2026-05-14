@@ -1,37 +1,49 @@
 {
-  "name": "wisteria",
-  "private": true,
+  "name": "@cooryn/wisteria-claw",
   "version": "0.1.0",
+  "description": "OpenClaw plugin for discovering GitHub contribution opportunities and preparing draft PRs.",
   "type": "module",
+  "main": "./dist/index.js",
+  "files": [
+    "dist",
+    "skills",
+    "openclaw.plugin.json",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
-    "knip": "knip",
-    "preview": "vite preview",
-    "tauri": "tauri"
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "dev": "tsx src/index.ts",
+    "clean": "rimraf dist"
+  },
+  "openclaw": {
+    "extensions": [
+      "./dist/index.js"
+    ],
+    "compat": {
+      "pluginApi": ">=2026.3.24-beta.2",
+      "minGatewayVersion": ">=2026.3.24-beta.2"
+    },
+    "install": {
+      "minHostVersion": ">=2026.3.24"
+    }
   },
   "dependencies": {
-    "@emotion/react": "^11.14.0",
-    "@emotion/styled": "^11.14.1",
-    "@mui/icons-material": "^6.0.0",
-    "@mui/material": "^6.0.0",
-    "@octokit/rest": "^22.0.1",
-    "@tauri-apps/api": "^2",
-    "@tauri-apps/plugin-dialog": "^2.7.0",
-    "@tauri-apps/plugin-opener": "^2",
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0",
-    "react-markdown": "^10.1.0",
-    "remark-gfm": "^4.0.1",
-    "zustand": "^5.0.12"
+    "@octokit/rest": "latest",
+    "@sinclair/typebox": "latest",
+    "openclaw": "latest",
+    "zod": "latest"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2",
-    "@types/react": "^19.1.8",
-    "@types/react-dom": "^19.1.6",
-    "@vitejs/plugin-react": "^4.6.0",
-    "knip": "^6.6.2",
-    "typescript": "~5.8.3",
-    "vite": "^7.0.4"
+    "@types/node": "latest",
+    "rimraf": "latest",
+    "tsx": "latest",
+    "typescript": "latest",
+    "vitest": "latest"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

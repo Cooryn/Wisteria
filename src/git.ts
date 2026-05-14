@@ -1,5 +1,5 @@
-import { spawn } from "node:child_process";
 import { Buffer } from "node:buffer";
+import { runPluginCommandWithTimeout } from "openclaw/plugin-sdk/run-command";
 
 import { WisteriaError } from "./errors.js";
 import { assertSafeWorkDir, redactSecrets } from "./safety.js";
@@ -29,60 +29,25 @@ export async function runGit(
 ): Promise<GitCommandResult> {
   assertSafeWorkDir(options.cwd, options.allowRoot);
 
-  return new Promise<GitCommandResult>((resolve, reject) => {
-    const child = spawn("git", args, {
+  try {
+    const result = await runPluginCommandWithTimeout({
+      argv: ["git", ...args],
       cwd: options.cwd,
-      env: {
-        ...process.env,
-        GIT_TERMINAL_PROMPT: "0",
-        ...options.env,
-      },
-      shell: false,
-      windowsHide: true,
+      timeoutMs: options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
     });
 
-    let stdout = "";
-    let stderr = "";
-    let timedOut = false;
-
-    const timeout = setTimeout(() => {
-      timedOut = true;
-      child.kill();
-    }, options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
-
-    child.stdout.on("data", (chunk: Buffer) => {
-      stdout += chunk.toString("utf8");
-    });
-
-    child.stderr.on("data", (chunk: Buffer) => {
-      stderr += chunk.toString("utf8");
-    });
-
-    child.on("error", (error) => {
-      clearTimeout(timeout);
-      reject(new WisteriaError(error.message, "GIT_SPAWN_FAILED"));
-    });
-
-    child.on("close", (code) => {
-      clearTimeout(timeout);
-      if (timedOut) {
-        resolve({
-          ok: false,
-          stdout: redactSecrets(stdout, options.secrets),
-          stderr: "Git command timed out.",
-          exitCode: code,
-        });
-        return;
-      }
-
-      resolve({
-        ok: code === 0,
-        stdout: redactSecrets(stdout, options.secrets),
-        stderr: redactSecrets(stderr, options.secrets),
-        exitCode: code,
-      });
-    });
-  });
+    return {
+      ok: result.code === 0,
+      stdout: redactSecrets(result.stdout, options.secrets),
+      stderr: redactSecrets(result.stderr, options.secrets),
+      exitCode: result.code,
+    };
+  } catch (error) {
+    throw new WisteriaError(
+      error instanceof Error ? error.message : "Failed to run git command.",
+      "GIT_SPAWN_FAILED",
+    );
+  }
 }
 
 export async function isGitAvailable(): Promise<boolean> {

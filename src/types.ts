@@ -262,7 +262,6 @@ export interface GitRunOptions {
   cwd: string;
   allowRoot: string;
   timeoutMs?: number;
-  env?: NodeJS.ProcessEnv;
   secrets?: string[];
 }
 

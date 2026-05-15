@@ -51,16 +51,41 @@ describe("recommendedAgents", () => {
     expect(recommendedAgents.maintainer.alsoAllow).not.toContain("wisteria_daily_issue_digest");
   });
 
+  it("lets every role read runtime preferences", () => {
+    expect(recommendedAgents.orchestrator.alsoAllow).toContain("wisteria_get_preferences");
+    expect(recommendedAgents.scout.alsoAllow).toContain("wisteria_get_preferences");
+    expect(recommendedAgents.analyst.alsoAllow).toContain("wisteria_get_preferences");
+    expect(recommendedAgents.coder.alsoAllow).toContain("wisteria_get_preferences");
+    expect(recommendedAgents.maintainer.alsoAllow).toContain("wisteria_get_preferences");
+  });
+
+  it("keeps the orchestrator on delegation-only workflow tools", () => {
+    expect(recommendedAgents.orchestrator.alsoAllow).not.toContain("wisteria_search_repos");
+    expect(recommendedAgents.orchestrator.alsoAllow).not.toContain("wisteria_search_issues");
+    expect(recommendedAgents.orchestrator.alsoAllow).not.toContain("wisteria_get_issue_context");
+    expect(recommendedAgents.orchestrator.alsoAllow).not.toContain("wisteria_daily_issue_digest");
+  });
+
   it("widens plugin tools with alsoAllow instead of relying on allow alone", () => {
     expect(recommendedAgents.scout.alsoAllow).toEqual(
-      expect.arrayContaining(["read", "wisteria_search_repos", "wisteria_daily_issue_digest"]),
+      expect.arrayContaining([
+        "read",
+        "wisteria_get_preferences",
+        "wisteria_search_repos",
+        "wisteria_daily_issue_digest",
+      ]),
     );
-    expect(recommendedAgents.analyst.alsoAllow).toEqual(["read", "wisteria_get_issue_context"]);
+    expect(recommendedAgents.analyst.alsoAllow).toEqual([
+      "read",
+      "wisteria_get_preferences",
+      "wisteria_get_issue_context",
+    ]);
     expect(recommendedAgents.coder.alsoAllow).toEqual(
       expect.arrayContaining([
         "read",
         "exec",
         "process",
+        "wisteria_get_preferences",
         "wisteria_prepare_contribution",
         "wisteria_check_workspace",
       ]),
@@ -70,6 +95,7 @@ describe("recommendedAgents", () => {
         "read",
         "exec",
         "process",
+        "wisteria_get_preferences",
         "wisteria_check_workspace",
         "wisteria_create_draft_pr",
       ]),
@@ -78,8 +104,7 @@ describe("recommendedAgents", () => {
       expect.arrayContaining([
         "read",
         "sessions_spawn",
-        "wisteria_search_repos",
-        "wisteria_daily_issue_digest",
+        "wisteria_get_preferences",
       ]),
     );
   });

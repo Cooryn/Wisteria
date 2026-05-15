@@ -23,6 +23,7 @@
         "lightContext": true,
         "toolsAllow": [
           "read",
+          "wisteria_get_preferences",
           "wisteria_daily_issue_digest"
         ]
       },
@@ -48,17 +49,17 @@
       "wakeMode": "now",
       "payload": {
         "kind": "agentTurn",
-        "message": "Search for strong open-source contribution targets for the coming week. Use Wisteria tools to produce a shortlist with up to 5 repositories and up to 3 issues per repository. For the top issues, include why they match the configured preferences, likely complexity, expected time investment, and what context should be reviewed before coding starts. Do not prepare workspaces, push branches, or create pull requests.",
+        "message": "Read the configured Wisteria preferences, then coordinate a weekly shortlist workflow. Delegate repository and issue discovery to wisteria-scout. Delegate deeper issue-context analysis to wisteria-analyst when needed. Return a shortlist with up to 5 repositories and up to 3 issues per repository. For the top issues, include why they match the configured preferences, likely complexity, expected time investment, and what context should be reviewed before coding starts. Do not prepare workspaces, push branches, or create pull requests.",
         "thinking": "medium",
         "timeoutSeconds": 480,
         "lightContext": true,
         "toolsAllow": [
           "read",
-          "wisteria_search_repos",
-          "wisteria_search_issues",
-          "wisteria_score_repo",
-          "wisteria_score_issue",
-          "wisteria_get_issue_context"
+          "wisteria_get_preferences",
+          "sessions_spawn",
+          "subagents",
+          "sessions_list",
+          "sessions_history"
         ]
       },
       "delivery": {

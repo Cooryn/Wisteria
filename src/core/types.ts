@@ -16,6 +16,25 @@ export interface WisteriaConfig {
   };
 }
 
+export interface WisteriaPreferencesResult {
+  source: "plugin-config";
+  hasGitHubToken: boolean;
+  allowGitCommands: boolean;
+  defaultWorkDir: string | null;
+  defaultLanguages: string[];
+  defaultTopics: string[];
+  defaultLabels: string[];
+  minStars: number | null;
+  maxStars: number | null;
+  dailyDigest: {
+    enabled: boolean;
+    timezone: string;
+    hour: number;
+    limit: number;
+    minScore: number;
+  };
+}
+
 export interface RepoScoreBreakdown {
   languageMatch: number;
   topicMatch: number;

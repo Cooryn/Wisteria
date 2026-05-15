@@ -22,12 +22,14 @@ import type {
   DailyDigestParams,
   IssueCandidate,
   IssueSearchParams,
+  WisteriaPreferencesResult,
   RepoCandidate,
   RepoSearchParams,
   ToolResult,
 } from "./core/types.js";
 
 export const wisteriaToolNames = [
+  "wisteria_get_preferences",
   "wisteria_search_repos",
   "wisteria_search_issues",
   "wisteria_score_repo",
@@ -62,6 +64,8 @@ const repoSearchSchema = Type.Object(
   },
   { additionalProperties: false },
 );
+
+const getPreferencesSchema = Type.Object({}, { additionalProperties: false });
 
 const issueSearchSchema = Type.Object(
   {
@@ -203,6 +207,38 @@ export default definePluginEntry({
       displayName: "Wisteria Create Draft PR",
       risk: "high",
       tags: ["git", "github", "draft-pr"],
+    });
+
+    api.registerTool({
+      name: "wisteria_get_preferences",
+      label: "Wisteria Get Preferences",
+      description:
+        "Return the effective non-secret Wisteria plugin preferences configured for this runtime.",
+      parameters: getPreferencesSchema,
+      async execute() {
+        return executeSafely(async () => {
+          const preferences: WisteriaPreferencesResult = {
+            source: "plugin-config",
+            hasGitHubToken: config.githubToken.trim().length > 0,
+            allowGitCommands: config.allowGitCommands ?? false,
+            defaultWorkDir: config.defaultWorkDir ?? null,
+            defaultLanguages: [...(config.defaultLanguages ?? [])],
+            defaultTopics: [...(config.defaultTopics ?? [])],
+            defaultLabels: [...(config.defaultLabels ?? [])],
+            minStars: config.minStars ?? null,
+            maxStars: config.maxStars ?? null,
+            dailyDigest: {
+              enabled: config.dailyDigest?.enabled ?? false,
+              timezone: config.dailyDigest?.timezone ?? "Asia/Tokyo",
+              hour: config.dailyDigest?.hour ?? 9,
+              limit: config.dailyDigest?.limit ?? 5,
+              minScore: config.dailyDigest?.minScore ?? 60,
+            },
+          };
+
+          return preferences;
+        });
+      },
     });
 
     api.registerTool({

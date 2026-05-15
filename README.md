@@ -159,6 +159,7 @@ openclaw --profile wisteria-dev plugins inspect wisteria-claw --runtime --json
 
 如果运行时正常，你应该能看到这些工具名：
 
+- `wisteria_get_preferences`
 - `wisteria_search_repos`
 - `wisteria_search_issues`
 - `wisteria_score_repo`
@@ -298,6 +299,7 @@ openclaw plugins inspect wisteria-claw --json
 
 | 工具名 | 类型 | 说明 |
 | --- | --- | --- |
+| `wisteria_get_preferences` | 只读 | 返回当前运行时配置好的非敏感偏好，例如默认语言、Topic、标签、工作目录和 digest 设置 |
 | `wisteria_search_repos` | 只读 | 搜索 GitHub 仓库 |
 | `wisteria_search_issues` | 只读 | 在仓库内搜索更适合贡献的 Issue |
 | `wisteria_score_repo` | 只读 | 对单个仓库做确定性评分 |
@@ -365,30 +367,31 @@ openclaw plugins inspect wisteria-claw --json
 
 - `wisteria-orchestrator`
   - 默认 Agent
-  - 负责和用户对话、拆任务、决定要不要委派
-  - 允许使用 `sessions_spawn`、`subagents`、`sessions_list`、`sessions_history`
-  - 不允许本地写文件、执行命令、准备工作区、创建 Draft PR
+  - 负责和用户对话、读取已配置偏好、拆任务、强制委派
+  - 只允许使用 `read`、`wisteria_get_preferences`、`sessions_spawn`、`subagents`、`sessions_list`、`sessions_history`
+  - 不允许直接调用仓库搜索、Issue 搜索、Issue 上下文、daily digest、本地写文件、执行命令、准备工作区、创建 Draft PR
 - `wisteria-scout`
-  - 负责搜索仓库、搜索 Issue、打分、生成 daily digest
+  - 负责读取已配置偏好、搜索仓库、搜索 Issue、打分、生成 daily digest
   - 只读，不执行命令，不写文件
 - `wisteria-analyst`
-  - 负责拉 Issue 上下文做可行性分析
+  - 负责读取已配置偏好、拉 Issue 上下文做可行性分析
   - 只读，不执行命令，不写文件
 - `wisteria-coder`
-  - 负责准备工作区和改代码
+  - 负责读取已配置偏好、准备工作区和改代码
   - 可以读写文件、执行命令、调用 `wisteria_prepare_contribution`
   - 不允许创建 Draft PR
 - `wisteria-maintainer`
-  - 负责检查工作区和创建 Draft PR
+  - 负责读取已配置偏好、检查工作区和创建 Draft PR
   - 不允许改代码
 
 ### 第四步：实际使用时的建议流程
 
 1. 让 `wisteria-orchestrator` 接收用户需求。
-2. 由 orchestrator 把“找仓库 / 找 Issue”委派给 `wisteria-scout`。
-3. 需要深挖某个 Issue 时，委派给 `wisteria-analyst`。
-4. 用户确认要开始做时，再让 `wisteria-coder` 准备工作区并编码。
-5. 最后由 `wisteria-maintainer` 检查状态并创建 Draft PR。
+2. 由 orchestrator 先调用 `wisteria_get_preferences` 读取已配置偏好。
+3. orchestrator 把“找仓库 / 找 Issue”委派给 `wisteria-scout`。
+4. 需要深挖某个 Issue 时，委派给 `wisteria-analyst`。
+5. 用户确认要开始做时，再让 `wisteria-coder` 准备工作区并编码。
+6. 最后由 `wisteria-maintainer` 检查状态并创建 Draft PR。
 
 ### 第五步：何时需要自己加 `bindings`
 
@@ -426,12 +429,12 @@ openclaw plugins inspect wisteria-claw --json
    - 每天 `09:00`
    - 时区 `Asia/Shanghai`
    - 由 `wisteria-scout` 执行
-   - 只允许调用 `wisteria_daily_issue_digest`
+   - 只允许调用 `wisteria_get_preferences` 和 `wisteria_daily_issue_digest`
 2. `wisteria-weekly-shortlist`
    - 每周一 `08:30`
    - 时区 `Asia/Shanghai`
    - 由 `wisteria-orchestrator` 执行
-   - 只做只读搜索和上下文整理，不准备工作区、不创建 PR
+   - 先读取已配置偏好，再委派给 scout / analyst 做只读发现和上下文整理，不准备工作区、不创建 PR
 
 ### 为什么默认 `delivery.mode` 是 `none`
 
@@ -519,6 +522,7 @@ openclaw cron show wisteria-weekly-shortlist
 ```json
 [
   "read",
+  "wisteria_get_preferences",
   "wisteria_daily_issue_digest"
 ]
 ```

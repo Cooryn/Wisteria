@@ -123,6 +123,14 @@ describe("example configuration files", () => {
         ...recommendedAgents.orchestrator.alsoAllow,
       ]),
     );
+    expect(orchestrator.tools.alsoAllow).not.toEqual(
+      expect.arrayContaining([
+        "wisteria_search_repos",
+        "wisteria_search_issues",
+        "wisteria_get_issue_context",
+        "wisteria_daily_issue_digest",
+      ]),
+    );
     expect(orchestrator.subagents?.allowAgents).toEqual([
       "wisteria-scout",
       "wisteria-analyst",
@@ -152,6 +160,15 @@ describe("example configuration files", () => {
       expect(job.delivery?.mode).toBe("none");
       expect(knownAgents.has(job.agentId ?? "")).toBe(true);
       expect(job.payload.toolsAllow).toContain("read");
+      if (job.agentId === "wisteria-orchestrator") {
+        expect(job.payload.toolsAllow).toEqual(
+          expect.arrayContaining([
+            "wisteria_get_preferences",
+            "sessions_spawn",
+            "subagents",
+          ]),
+        );
+      }
       expect(job.payload.toolsAllow).not.toEqual(
         expect.arrayContaining([
           "wisteria_prepare_contribution",

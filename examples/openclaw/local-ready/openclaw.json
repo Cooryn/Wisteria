@@ -38,10 +38,7 @@
             "subagents",
             "sessions_list",
             "sessions_history",
-            "wisteria_search_repos",
-            "wisteria_search_issues",
-            "wisteria_get_issue_context",
-            "wisteria_daily_issue_digest"
+            "wisteria_get_preferences"
           ],
           "deny": [
             "write",
@@ -78,6 +75,7 @@
           "profile": "minimal",
           "alsoAllow": [
             "read",
+            "wisteria_get_preferences",
             "wisteria_search_repos",
             "wisteria_search_issues",
             "wisteria_score_repo",
@@ -110,6 +108,7 @@
           "profile": "minimal",
           "alsoAllow": [
             "read",
+            "wisteria_get_preferences",
             "wisteria_get_issue_context"
           ],
           "deny": [
@@ -130,7 +129,7 @@
       {
         "id": "wisteria-coder",
         "name": "Wisteria Coder",
-        "workspace": "C:\\Users\\Coryn\\code\\open-source",
+        "workspace": "C:\\Users\\Coryn\\.openclaw\\workspace-wisteria-coder",
         "agentDir": "C:\\Users\\Coryn\\.openclaw\\agents\\wisteria-coder\\agent",
         "skills": [
           "wisteria"
@@ -144,6 +143,7 @@
             "apply_patch",
             "exec",
             "process",
+            "wisteria_get_preferences",
             "wisteria_prepare_contribution",
             "wisteria_check_workspace"
           ],
@@ -157,7 +157,7 @@
       {
         "id": "wisteria-maintainer",
         "name": "Wisteria Maintainer",
-        "workspace": "C:\\Users\\Coryn\\code\\open-source",
+        "workspace": "C:\\Users\\Coryn\\.openclaw\\workspace-wisteria-maintainer",
         "agentDir": "C:\\Users\\Coryn\\.openclaw\\agents\\wisteria-maintainer\\agent",
         "skills": [
           "wisteria"
@@ -168,6 +168,7 @@
             "read",
             "exec",
             "process",
+            "wisteria_get_preferences",
             "wisteria_check_workspace",
             "wisteria_create_draft_pr"
           ],

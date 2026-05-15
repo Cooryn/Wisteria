@@ -64,10 +64,7 @@
             "subagents",
             "sessions_list",
             "sessions_history",
-            "wisteria_search_repos",
-            "wisteria_search_issues",
-            "wisteria_get_issue_context",
-            "wisteria_daily_issue_digest"
+            "wisteria_get_preferences"
           ],
           "deny": [
             "write",
@@ -104,6 +101,7 @@
           "profile": "minimal",
           "alsoAllow": [
             "read",
+            "wisteria_get_preferences",
             "wisteria_search_repos",
             "wisteria_search_issues",
             "wisteria_score_repo",
@@ -136,6 +134,7 @@
           "profile": "minimal",
           "alsoAllow": [
             "read",
+            "wisteria_get_preferences",
             "wisteria_get_issue_context"
           ],
           "deny": [
@@ -170,6 +169,7 @@
             "apply_patch",
             "exec",
             "process",
+            "wisteria_get_preferences",
             "wisteria_prepare_contribution",
             "wisteria_check_workspace"
           ],
@@ -194,6 +194,7 @@
             "read",
             "exec",
             "process",
+            "wisteria_get_preferences",
             "wisteria_check_workspace",
             "wisteria_create_draft_pr"
           ],

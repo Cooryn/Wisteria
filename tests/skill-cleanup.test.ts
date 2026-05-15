@@ -20,6 +20,7 @@ describe("skill cleanup", () => {
 
     expect(manifest.skills).toContain("skills");
     expect(manifest.contracts.tools).toContain("wisteria_daily_issue_digest");
+    expect(manifest.contracts.tools).toContain("wisteria_get_preferences");
   });
 
   it("registers tools in plugin runtime entry", () => {

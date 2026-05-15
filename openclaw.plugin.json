@@ -113,6 +113,7 @@
   },
   "contracts": {
     "tools": [
+      "wisteria_get_preferences",
       "wisteria_search_repos",
       "wisteria_search_issues",
       "wisteria_score_repo",

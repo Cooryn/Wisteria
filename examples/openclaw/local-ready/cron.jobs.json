@@ -1,0 +1,71 @@
+{
+  "version": 1,
+  "jobs": [
+    {
+      "id": "wisteria-daily-issue-digest",
+      "agentId": "wisteria-scout",
+      "name": "Wisteria Daily Issue Digest",
+      "description": "Generate a read-only daily shortlist of beginner-friendly GitHub issues.",
+      "enabled": true,
+      "createdAtMs": 1778822400000,
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 9 * * *",
+        "tz": "Asia/Shanghai"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Use wisteria_daily_issue_digest to recommend exactly 5 GitHub issues for today's contribution session. Prefer the configured languages, topics, labels, and star range. Return a concise ranked digest with repository, issue number, score, estimated difficulty, estimated time, reasons, and the next best action for each issue.",
+        "thinking": "low",
+        "timeoutSeconds": 300,
+        "lightContext": true,
+        "toolsAllow": [
+          "read",
+          "wisteria_daily_issue_digest"
+        ]
+      },
+      "delivery": {
+        "mode": "none"
+      },
+      "failureAlert": false,
+      "state": {}
+    },
+    {
+      "id": "wisteria-weekly-shortlist",
+      "agentId": "wisteria-orchestrator",
+      "name": "Wisteria Weekly Shortlist",
+      "description": "Build a weekly shortlist of repositories and issues worth tackling next.",
+      "enabled": true,
+      "createdAtMs": 1778822400000,
+      "schedule": {
+        "kind": "cron",
+        "expr": "30 8 * * 1",
+        "tz": "Asia/Shanghai"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Search for strong open-source contribution targets for the coming week. Use Wisteria tools to produce a shortlist with up to 5 repositories and up to 3 issues per repository. For the top issues, include why they match the configured preferences, likely complexity, expected time investment, and what context should be reviewed before coding starts. Do not prepare workspaces, push branches, or create pull requests.",
+        "thinking": "medium",
+        "timeoutSeconds": 480,
+        "lightContext": true,
+        "toolsAllow": [
+          "read",
+          "wisteria_search_repos",
+          "wisteria_search_issues",
+          "wisteria_score_repo",
+          "wisteria_score_issue",
+          "wisteria_get_issue_context"
+        ]
+      },
+      "delivery": {
+        "mode": "none"
+      },
+      "failureAlert": false,
+      "state": {}
+    }
+  ]
+}

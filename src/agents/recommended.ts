@@ -8,7 +8,9 @@ export const recommendedAgents: Record<
     id: "wisteria-scout",
     name: "Wisteria Scout",
     description: "Discovery-only agent for repository and issue scouting.",
-    allow: [
+    profile: "minimal",
+    alsoAllow: [
+      "read",
       "wisteria_search_repos",
       "wisteria_search_issues",
       "wisteria_score_repo",
@@ -32,7 +34,8 @@ export const recommendedAgents: Record<
     id: "wisteria-analyst",
     name: "Wisteria Analyst",
     description: "Issue-analysis agent with read-only repository context access.",
-    allow: ["wisteria_get_issue_context"],
+    profile: "minimal",
+    alsoAllow: ["read", "wisteria_get_issue_context"],
     deny: [
       "exec",
       "write",
@@ -51,11 +54,14 @@ export const recommendedAgents: Record<
     id: "wisteria-coder",
     name: "Wisteria Coder",
     description: "Workspace-preparation and code-change agent without push or PR rights.",
-    allow: [
+    profile: "minimal",
+    alsoAllow: [
       "read",
       "write",
       "edit",
       "apply_patch",
+      "exec",
+      "process",
       "wisteria_prepare_contribution",
       "wisteria_check_workspace",
     ],
@@ -69,7 +75,14 @@ export const recommendedAgents: Record<
     id: "wisteria-maintainer",
     name: "Wisteria Maintainer",
     description: "Verification and Draft PR agent without code editing privileges.",
-    allow: ["wisteria_check_workspace", "wisteria_create_draft_pr"],
+    profile: "minimal",
+    alsoAllow: [
+      "read",
+      "exec",
+      "process",
+      "wisteria_check_workspace",
+      "wisteria_create_draft_pr",
+    ],
     deny: ["write", "apply_patch", "wisteria_prepare_contribution"],
     readOnly: false,
     canWriteFiles: false,
@@ -80,7 +93,13 @@ export const recommendedAgents: Record<
     id: "wisteria-orchestrator",
     name: "Wisteria Orchestrator",
     description: "Coordinator that asks for confirmation before risky actions.",
-    allow: [
+    profile: "minimal",
+    alsoAllow: [
+      "read",
+      "sessions_spawn",
+      "subagents",
+      "sessions_list",
+      "sessions_history",
       "wisteria_search_repos",
       "wisteria_search_issues",
       "wisteria_get_issue_context",

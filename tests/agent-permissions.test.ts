@@ -29,7 +29,7 @@ describe("recommendedAgents", () => {
   });
 
   it("does not grant Draft PR creation to coder", () => {
-    expect(recommendedAgents.coder.allow).not.toContain("wisteria_create_draft_pr");
+    expect(recommendedAgents.coder.alsoAllow).not.toContain("wisteria_create_draft_pr");
     expect(recommendedAgents.coder.deny).toContain("wisteria_create_draft_pr");
   });
 
@@ -45,10 +45,43 @@ describe("recommendedAgents", () => {
   });
 
   it("only exposes daily digest to scout in the recommended config", () => {
-    expect(recommendedAgents.scout.allow).toContain("wisteria_daily_issue_digest");
-    expect(recommendedAgents.analyst.allow).not.toContain("wisteria_daily_issue_digest");
-    expect(recommendedAgents.coder.allow).not.toContain("wisteria_daily_issue_digest");
-    expect(recommendedAgents.maintainer.allow).not.toContain("wisteria_daily_issue_digest");
+    expect(recommendedAgents.scout.alsoAllow).toContain("wisteria_daily_issue_digest");
+    expect(recommendedAgents.analyst.alsoAllow).not.toContain("wisteria_daily_issue_digest");
+    expect(recommendedAgents.coder.alsoAllow).not.toContain("wisteria_daily_issue_digest");
+    expect(recommendedAgents.maintainer.alsoAllow).not.toContain("wisteria_daily_issue_digest");
+  });
+
+  it("widens plugin tools with alsoAllow instead of relying on allow alone", () => {
+    expect(recommendedAgents.scout.alsoAllow).toEqual(
+      expect.arrayContaining(["read", "wisteria_search_repos", "wisteria_daily_issue_digest"]),
+    );
+    expect(recommendedAgents.analyst.alsoAllow).toEqual(["read", "wisteria_get_issue_context"]);
+    expect(recommendedAgents.coder.alsoAllow).toEqual(
+      expect.arrayContaining([
+        "read",
+        "exec",
+        "process",
+        "wisteria_prepare_contribution",
+        "wisteria_check_workspace",
+      ]),
+    );
+    expect(recommendedAgents.maintainer.alsoAllow).toEqual(
+      expect.arrayContaining([
+        "read",
+        "exec",
+        "process",
+        "wisteria_check_workspace",
+        "wisteria_create_draft_pr",
+      ]),
+    );
+    expect(recommendedAgents.orchestrator.alsoAllow).toEqual(
+      expect.arrayContaining([
+        "read",
+        "sessions_spawn",
+        "wisteria_search_repos",
+        "wisteria_daily_issue_digest",
+      ]),
+    );
   });
 });
 

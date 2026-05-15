@@ -14,8 +14,10 @@ const multiAgentExample = JSON.parse(
     list: Array<{
       id: string;
       default?: boolean;
+      workspace?: string;
       tools: {
-        allow?: string[];
+        profile?: string;
+        alsoAllow?: string[];
         deny?: string[];
       };
       subagents?: {
@@ -72,21 +74,40 @@ describe("example configuration files", () => {
 
   it("keeps the multi-agent example wired to the plugin", () => {
     expect(multiAgentExample.plugins.entries["wisteria-claw"]?.enabled).toBe(true);
+    expect(
+      multiAgentExample.plugins.entries["wisteria-claw"]?.config?.defaultWorkDir,
+    ).toBe("~/.openclaw/workspace/wisteria-contributions");
     expect(multiAgentExample.cron.enabled).toBe(true);
     expect(multiAgentExample.cron.store).toContain("jobs.json");
   });
 
+  it("keeps every example workspace under the OpenClaw workspace root", () => {
+    for (const agent of multiAgentExample.agents.list) {
+      expect(agent.workspace).toMatch(/^~\/\.openclaw\/workspace(?:\/|$)/);
+    }
+  });
+
   it("keeps worker roles aligned with the recommended role matrix", () => {
-    expect(agentById("wisteria-scout").tools.allow).toEqual(recommendedAgents.scout.allow);
-    expect(agentById("wisteria-analyst").tools.allow).toEqual(recommendedAgents.analyst.allow);
-    expect(agentById("wisteria-coder").tools.allow).toEqual(
-      expect.arrayContaining(recommendedAgents.coder.allow),
+    expect(agentById("wisteria-scout").tools.profile).toBe(recommendedAgents.scout.profile);
+    expect(agentById("wisteria-scout").tools.alsoAllow).toEqual(
+      recommendedAgents.scout.alsoAllow,
+    );
+    expect(agentById("wisteria-analyst").tools.profile).toBe(recommendedAgents.analyst.profile);
+    expect(agentById("wisteria-analyst").tools.alsoAllow).toEqual(
+      recommendedAgents.analyst.alsoAllow,
+    );
+    expect(agentById("wisteria-coder").tools.profile).toBe(recommendedAgents.coder.profile);
+    expect(agentById("wisteria-coder").tools.alsoAllow).toEqual(
+      recommendedAgents.coder.alsoAllow,
     );
     expect(agentById("wisteria-coder").tools.deny).toEqual(
       expect.arrayContaining(recommendedAgents.coder.deny),
     );
-    expect(agentById("wisteria-maintainer").tools.allow).toEqual(
-      expect.arrayContaining(recommendedAgents.maintainer.allow),
+    expect(agentById("wisteria-maintainer").tools.profile).toBe(
+      recommendedAgents.maintainer.profile,
+    );
+    expect(agentById("wisteria-maintainer").tools.alsoAllow).toEqual(
+      recommendedAgents.maintainer.alsoAllow,
     );
     expect(agentById("wisteria-maintainer").tools.deny).toEqual(
       expect.arrayContaining(recommendedAgents.maintainer.deny),
@@ -96,13 +117,10 @@ describe("example configuration files", () => {
   it("grants the orchestrator delegation rights without risky local-write tools", () => {
     const orchestrator = agentById("wisteria-orchestrator");
     expect(orchestrator.default).toBe(true);
-    expect(orchestrator.tools.allow).toEqual(
+    expect(orchestrator.tools.profile).toBe(recommendedAgents.orchestrator.profile);
+    expect(orchestrator.tools.alsoAllow).toEqual(
       expect.arrayContaining([
-        "sessions_spawn",
-        "subagents",
-        "sessions_list",
-        "sessions_history",
-        ...recommendedAgents.orchestrator.allow,
+        ...recommendedAgents.orchestrator.alsoAllow,
       ]),
     );
     expect(orchestrator.subagents?.allowAgents).toEqual([
@@ -133,6 +151,7 @@ describe("example configuration files", () => {
       expect(job.sessionTarget).toBe("isolated");
       expect(job.delivery?.mode).toBe("none");
       expect(knownAgents.has(job.agentId ?? "")).toBe(true);
+      expect(job.payload.toolsAllow).toContain("read");
       expect(job.payload.toolsAllow).not.toEqual(
         expect.arrayContaining([
           "wisteria_prepare_contribution",

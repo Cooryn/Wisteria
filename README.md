@@ -175,6 +175,59 @@ openclaw --profile wisteria-dev plugins inspect wisteria-claw --runtime --json
 openclaw --profile wisteria-dev doctor --fix
 ```
 
+## Troubleshooting: `No callable tools remain`
+
+如果你看到类似下面的错误：
+
+```text
+No callable tools remain after resolving explicit tool allowlist
+```
+
+最常见的原因不是“插件没安装”，而是 Agent 工具配置写法不对。
+
+在 OpenClaw 里：
+
+- `tools.allow` 是“收窄已有工具集”
+- `tools.alsoAllow` 是“在当前 profile 的基础上额外加入工具”
+- 但同一个 `tools` 对象里，`allow` 和 `alsoAllow` 不能同时使用
+
+对 Wisteria 这种插件工具，最稳妥的写法是：
+
+1. 选一个足够收敛的 profile，例如 `minimal`
+2. 只用 `tools.alsoAllow` 精确加入 `read`、`sessions_*` 和 `wisteria_*`
+3. 如果 Agent 依赖 Skill，通常还要保留 `read`，否则它连 `SKILL.md` 都读不到
+
+正确示例：
+
+```json
+{
+  "tools": {
+    "profile": "minimal",
+    "alsoAllow": [
+      "read",
+      "wisteria_search_repos",
+      "wisteria_search_issues",
+      "wisteria_daily_issue_digest"
+    ],
+    "deny": [
+      "write",
+      "edit",
+      "apply_patch",
+      "exec",
+      "process"
+    ]
+  }
+}
+```
+
+如果你改的是现有 Gateway 正在使用的 `openclaw.json`，改完后还需要：
+
+```bash
+openclaw gateway restart
+```
+
+仓库里的最新 [examples/openclaw/openclaw.multi-agent.fragment.json](./examples/openclaw/openclaw.multi-agent.fragment.json) 已经按这个规则修正。
+
 ## Troubleshooting: Skill tries to load missing `.mjs` files
 
 If OpenClaw reports missing files such as:
@@ -216,7 +269,7 @@ openclaw plugins inspect wisteria-claw --json
 | 字段 | 必填 | 说明 |
 | --- | --- | --- |
 | `githubToken` | 否 | 可选的 GitHub Personal Access Token。强烈建议配置以避免 GitHub 搜索限流；`fork`、`push` 和 Draft PR 创建必须配置 |
-| `defaultWorkDir` | 否 | 默认本地工作目录 |
+| `defaultWorkDir` | 否 | 默认本地工作目录，推荐放在 `~/.openclaw/workspace/` 下面 |
 | `defaultLanguages` | 否 | 默认仓库搜索语言列表 |
 | `defaultTopics` | 否 | 默认仓库搜索 Topic 列表 |
 | `defaultLabels` | 否 | 默认 Issue 标签，默认值为 `good first issue`、`help wanted`、`beginner`、`documentation`、`bug` |
@@ -299,7 +352,7 @@ openclaw plugins inspect wisteria-claw --json
 
 - `REPLACE_WITH_GITHUB_PAT`
 - `defaultWorkDir`
-- `~/code/open-source` 这类工作目录
+- `~/.openclaw/workspace/wisteria-contributions` 这类位于 OpenClaw workspace 下的工作目录
 
 要点：
 
@@ -457,10 +510,15 @@ openclaw cron show wisteria-weekly-shortlist
 
 在 `payload.toolsAllow` 里控制。
 
+注意：`payload.toolsAllow` 也只是进一步收窄当前 Agent 已经拥有的工具，不会额外“添加”插件工具。
+
+如果这个任务依赖某个 Skill，并且模型可能先去读 `SKILL.md`，那就把 `read` 也保留下来。
+
 例如 daily digest 任务只允许：
 
 ```json
 [
+  "read",
   "wisteria_daily_issue_digest"
 ]
 ```

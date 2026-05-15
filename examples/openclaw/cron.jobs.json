@@ -23,6 +23,7 @@
         "timeoutSeconds": 300,
         "lightContext": true,
         "toolsAllow": [
+          "read",
           "wisteria_daily_issue_digest"
         ]
       },
@@ -54,6 +55,7 @@
         "timeoutSeconds": 480,
         "lightContext": true,
         "toolsAllow": [
+          "read",
           "wisteria_search_repos",
           "wisteria_search_issues",
           "wisteria_score_repo",

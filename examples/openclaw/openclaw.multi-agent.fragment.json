@@ -5,7 +5,7 @@
         "enabled": true,
         "config": {
           "githubToken": "REPLACE_WITH_GITHUB_PAT",
-          "defaultWorkDir": "~/code/open-source",
+          "defaultWorkDir": "~/.openclaw/workspace/wisteria-contributions",
           "defaultLanguages": [
             "TypeScript",
             "Rust"
@@ -51,14 +51,15 @@
         "id": "wisteria-orchestrator",
         "default": true,
         "name": "Wisteria Orchestrator",
-        "workspace": "~/.openclaw/workspace-wisteria-orchestrator",
+        "workspace": "~/.openclaw/workspace/wisteria-orchestrator",
         "agentDir": "~/.openclaw/agents/wisteria-orchestrator/agent",
         "skills": [
           "wisteria"
         ],
         "tools": {
-          "profile": "coding",
-          "allow": [
+          "profile": "minimal",
+          "alsoAllow": [
+            "read",
             "sessions_spawn",
             "subagents",
             "sessions_list",
@@ -94,13 +95,15 @@
       {
         "id": "wisteria-scout",
         "name": "Wisteria Scout",
-        "workspace": "~/.openclaw/workspace-wisteria-scout",
+        "workspace": "~/.openclaw/workspace/wisteria-scout",
         "agentDir": "~/.openclaw/agents/wisteria-scout/agent",
         "skills": [
           "wisteria"
         ],
         "tools": {
-          "allow": [
+          "profile": "minimal",
+          "alsoAllow": [
+            "read",
             "wisteria_search_repos",
             "wisteria_search_issues",
             "wisteria_score_repo",
@@ -124,13 +127,15 @@
       {
         "id": "wisteria-analyst",
         "name": "Wisteria Analyst",
-        "workspace": "~/.openclaw/workspace-wisteria-analyst",
+        "workspace": "~/.openclaw/workspace/wisteria-analyst",
         "agentDir": "~/.openclaw/agents/wisteria-analyst/agent",
         "skills": [
           "wisteria"
         ],
         "tools": {
-          "allow": [
+          "profile": "minimal",
+          "alsoAllow": [
+            "read",
             "wisteria_get_issue_context"
           ],
           "deny": [
@@ -151,14 +156,14 @@
       {
         "id": "wisteria-coder",
         "name": "Wisteria Coder",
-        "workspace": "~/code/open-source",
+        "workspace": "~/.openclaw/workspace/wisteria-coder",
         "agentDir": "~/.openclaw/agents/wisteria-coder/agent",
         "skills": [
           "wisteria"
         ],
         "tools": {
-          "profile": "coding",
-          "allow": [
+          "profile": "minimal",
+          "alsoAllow": [
             "read",
             "write",
             "edit",
@@ -178,14 +183,14 @@
       {
         "id": "wisteria-maintainer",
         "name": "Wisteria Maintainer",
-        "workspace": "~/code/open-source",
+        "workspace": "~/.openclaw/workspace/wisteria-maintainer",
         "agentDir": "~/.openclaw/agents/wisteria-maintainer/agent",
         "skills": [
           "wisteria"
         ],
         "tools": {
-          "profile": "coding",
-          "allow": [
+          "profile": "minimal",
+          "alsoAllow": [
             "read",
             "exec",
             "process",

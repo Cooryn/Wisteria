@@ -269,7 +269,8 @@ export interface RecommendedAgent {
   id: string;
   name: string;
   description: string;
-  allow: string[];
+  profile: "minimal" | "coding";
+  alsoAllow: string[];
   deny: string[];
   readOnly: boolean;
   canWriteFiles: boolean;

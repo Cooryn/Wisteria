@@ -82,7 +82,7 @@ export const pluginConfigUiHints = {
   },
   defaultWorkDir: {
     label: "Default working directory",
-    placeholder: "~/code/open-source",
+    placeholder: "~/.openclaw/workspace/wisteria-contributions",
   },
   allowGitCommands: {
     label: "Allow local Git commands",

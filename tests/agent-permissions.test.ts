@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { createTestPluginApi } from "openclaw/plugin-sdk/plugin-test-api";
 import { describe, expect, it, vi } from "vitest";
 
-import { recommendedAgents } from "../src/agents.js";
+import { recommendedAgents } from "../src/agents/recommended.js";
 import pluginEntry from "../src/index.js";
 
 const manifest = JSON.parse(

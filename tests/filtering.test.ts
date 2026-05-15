@@ -2,14 +2,14 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-import { generateDailyIssueDigest } from "../src/dailyDigest.js";
-import { buildRepoSearchPlan, searchRepositories } from "../src/github.js";
+import { generateDailyIssueDigest } from "../src/github/daily-digest.js";
+import { buildRepoSearchPlan, searchRepositories } from "../src/github/client.js";
 import {
   filterContributionIssues,
   normalizeIssueLabel,
   searchIssues,
-} from "../src/issues.js";
-import type { IssueCandidate, WisteriaConfig } from "../src/types.js";
+} from "../src/github/issues.js";
+import type { IssueCandidate, WisteriaConfig } from "../src/core/types.js";
 
 const config: WisteriaConfig = {
   githubToken: "",
@@ -247,9 +247,9 @@ describe("filtering", () => {
   });
 
   it("keeps daily digest independent from workspace, git, and PR code", () => {
-    const source = readFileSync(new URL("../src/dailyDigest.ts", import.meta.url), "utf8");
-    expect(source).not.toContain("./workspace.js");
-    expect(source).not.toContain("./git.js");
-    expect(source).not.toContain("./pr.js");
+    const source = readFileSync(new URL("../src/github/daily-digest.ts", import.meta.url), "utf8");
+    expect(source).not.toContain("../workspace/workspace.js");
+    expect(source).not.toContain("../workspace/git.js");
+    expect(source).not.toContain("../workspace/pr.js");
   });
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildRepoSearchPlan, buildRepoSearchQuery } from "../src/github.js";
+import { buildRepoSearchPlan, buildRepoSearchQuery } from "../src/github/client.js";
 
 describe("buildRepoSearchQuery", () => {
   it("includes language filters", () => {

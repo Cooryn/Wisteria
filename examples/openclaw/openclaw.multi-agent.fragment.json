@@ -1,0 +1,217 @@
+{
+  "plugins": {
+    "entries": {
+      "wisteria-claw": {
+        "enabled": true,
+        "config": {
+          "githubToken": "REPLACE_WITH_GITHUB_PAT",
+          "defaultWorkDir": "~/code/open-source",
+          "defaultLanguages": [
+            "TypeScript",
+            "Rust"
+          ],
+          "defaultTopics": [
+            "developer-tools",
+            "automation",
+            "cli"
+          ],
+          "defaultLabels": [
+            "good first issue",
+            "help wanted"
+          ],
+          "minStars": 50,
+          "maxStars": 25000,
+          "allowGitCommands": true,
+          "dailyDigest": {
+            "enabled": true,
+            "timezone": "Asia/Shanghai",
+            "hour": 9,
+            "limit": 5,
+            "minScore": 65
+          }
+        }
+      }
+    }
+  },
+  "agents": {
+    "defaults": {
+      "workspace": "~/.openclaw/workspace",
+      "thinkingDefault": "medium",
+      "reasoningDefault": "off",
+      "toolProgressDetail": "explain",
+      "subagents": {
+        "maxConcurrent": 4,
+        "maxChildrenPerAgent": 4,
+        "runTimeoutSeconds": 900,
+        "requireAgentId": true
+      }
+    },
+    "list": [
+      {
+        "id": "wisteria-orchestrator",
+        "default": true,
+        "name": "Wisteria Orchestrator",
+        "workspace": "~/.openclaw/workspace-wisteria-orchestrator",
+        "agentDir": "~/.openclaw/agents/wisteria-orchestrator/agent",
+        "skills": [
+          "wisteria"
+        ],
+        "tools": {
+          "profile": "coding",
+          "allow": [
+            "sessions_spawn",
+            "subagents",
+            "sessions_list",
+            "sessions_history",
+            "wisteria_search_repos",
+            "wisteria_search_issues",
+            "wisteria_get_issue_context",
+            "wisteria_daily_issue_digest"
+          ],
+          "deny": [
+            "write",
+            "edit",
+            "apply_patch",
+            "exec",
+            "process",
+            "browser",
+            "canvas",
+            "wisteria_prepare_contribution",
+            "wisteria_check_workspace",
+            "wisteria_create_draft_pr"
+          ]
+        },
+        "subagents": {
+          "allowAgents": [
+            "wisteria-scout",
+            "wisteria-analyst",
+            "wisteria-coder",
+            "wisteria-maintainer"
+          ],
+          "requireAgentId": true
+        }
+      },
+      {
+        "id": "wisteria-scout",
+        "name": "Wisteria Scout",
+        "workspace": "~/.openclaw/workspace-wisteria-scout",
+        "agentDir": "~/.openclaw/agents/wisteria-scout/agent",
+        "skills": [
+          "wisteria"
+        ],
+        "tools": {
+          "allow": [
+            "wisteria_search_repos",
+            "wisteria_search_issues",
+            "wisteria_score_repo",
+            "wisteria_score_issue",
+            "wisteria_daily_issue_digest"
+          ],
+          "deny": [
+            "exec",
+            "process",
+            "write",
+            "edit",
+            "apply_patch",
+            "browser",
+            "canvas",
+            "wisteria_prepare_contribution",
+            "wisteria_check_workspace",
+            "wisteria_create_draft_pr"
+          ]
+        }
+      },
+      {
+        "id": "wisteria-analyst",
+        "name": "Wisteria Analyst",
+        "workspace": "~/.openclaw/workspace-wisteria-analyst",
+        "agentDir": "~/.openclaw/agents/wisteria-analyst/agent",
+        "skills": [
+          "wisteria"
+        ],
+        "tools": {
+          "allow": [
+            "wisteria_get_issue_context"
+          ],
+          "deny": [
+            "exec",
+            "process",
+            "write",
+            "edit",
+            "apply_patch",
+            "browser",
+            "canvas",
+            "wisteria_prepare_contribution",
+            "wisteria_check_workspace",
+            "wisteria_create_draft_pr",
+            "wisteria_daily_issue_digest"
+          ]
+        }
+      },
+      {
+        "id": "wisteria-coder",
+        "name": "Wisteria Coder",
+        "workspace": "~/code/open-source",
+        "agentDir": "~/.openclaw/agents/wisteria-coder/agent",
+        "skills": [
+          "wisteria"
+        ],
+        "tools": {
+          "profile": "coding",
+          "allow": [
+            "read",
+            "write",
+            "edit",
+            "apply_patch",
+            "exec",
+            "process",
+            "wisteria_prepare_contribution",
+            "wisteria_check_workspace"
+          ],
+          "deny": [
+            "browser",
+            "canvas",
+            "wisteria_create_draft_pr"
+          ]
+        }
+      },
+      {
+        "id": "wisteria-maintainer",
+        "name": "Wisteria Maintainer",
+        "workspace": "~/code/open-source",
+        "agentDir": "~/.openclaw/agents/wisteria-maintainer/agent",
+        "skills": [
+          "wisteria"
+        ],
+        "tools": {
+          "profile": "coding",
+          "allow": [
+            "read",
+            "exec",
+            "process",
+            "wisteria_check_workspace",
+            "wisteria_create_draft_pr"
+          ],
+          "deny": [
+            "write",
+            "edit",
+            "apply_patch",
+            "browser",
+            "canvas",
+            "wisteria_prepare_contribution"
+          ]
+        }
+      }
+    ]
+  },
+  "cron": {
+    "enabled": true,
+    "store": "~/.openclaw/cron/jobs.json",
+    "maxConcurrentRuns": 2,
+    "sessionRetention": "24h",
+    "runLog": {
+      "maxBytes": "2mb",
+      "keepLines": 2000
+    }
+  }
+}

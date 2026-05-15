@@ -10,21 +10,21 @@ import {
   pluginConfigUiHints,
   resolveConfig,
   withRepoSearchDefaults,
-} from "./config.js";
-import { generateDailyIssueDigest } from "./dailyDigest.js";
-import { toToolError } from "./errors.js";
-import { createGitHubClient, searchRepositories } from "./github.js";
-import { getIssueContext, searchIssues } from "./issues.js";
-import { createDraftPrFromWorkspace } from "./pr.js";
-import { estimateIssueDifficulty, estimateIssueTime, scoreIssue, scoreRepo } from "./scoring.js";
-import { checkWorkspaceStatus, prepareContributionWorkspace } from "./workspace.js";
+} from "./core/config.js";
+import { generateDailyIssueDigest } from "./github/daily-digest.js";
+import { toToolError } from "./core/errors.js";
+import { createGitHubClient, searchRepositories } from "./github/client.js";
+import { getIssueContext, searchIssues } from "./github/issues.js";
+import { createDraftPrFromWorkspace } from "./workspace/pr.js";
+import { estimateIssueDifficulty, estimateIssueTime, scoreIssue, scoreRepo } from "./github/scoring.js";
+import { checkWorkspaceStatus, prepareContributionWorkspace } from "./workspace/workspace.js";
 import type {
   IssueCandidate,
   IssueSearchParams,
   RepoCandidate,
   RepoSearchParams,
   ToolResult,
-} from "./types.js";
+} from "./core/types.js";
 
 export const wisteriaToolNames = [
   "wisteria_search_repos",

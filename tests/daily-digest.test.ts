@@ -2,8 +2,8 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it, vi } from "vitest";
 
-import { generateDailyIssueDigest } from "../src/dailyDigest.js";
-import type { RepoRecommendation, WisteriaConfig } from "../src/types.js";
+import { generateDailyIssueDigest } from "../src/github/daily-digest.js";
+import type { RepoRecommendation, WisteriaConfig } from "../src/core/types.js";
 
 const baseConfig: WisteriaConfig = {
   githubToken: "",
@@ -275,9 +275,9 @@ describe("generateDailyIssueDigest", () => {
   });
 
   it("does not depend on workspace, git, or PR modules", () => {
-    const source = readFileSync(new URL("../src/dailyDigest.ts", import.meta.url), "utf8");
+    const source = readFileSync(new URL("../src/github/daily-digest.ts", import.meta.url), "utf8");
     expect(source).not.toMatch(/workspace/i);
-    expect(source).not.toMatch(/from "\.\/git\.js"/);
-    expect(source).not.toMatch(/from "\.\/pr\.js"/);
+    expect(source).not.toMatch(/workspace\/git/i);
+    expect(source).not.toMatch(/workspace\/pr/i);
   });
 });

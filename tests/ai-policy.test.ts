@@ -3,7 +3,7 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { getIssueContext } from "../src/issues.js";
+import { getIssueContext } from "../src/github/issues.js";
 
 function collectTsFiles(dir: string): string[] {
   const entries = readdirSync(dir).flatMap((name) => {
@@ -112,7 +112,7 @@ describe("AI policy", () => {
   });
 
   it("keeps daily digest free of model API calls", () => {
-    const source = readFileSync(new URL("../src/dailyDigest.ts", import.meta.url), "utf8");
+    const source = readFileSync(new URL("../src/github/daily-digest.ts", import.meta.url), "utf8");
     expect(source).not.toMatch(/openai|anthropic|gemini|chatCompletions|responses/iu);
   });
 });

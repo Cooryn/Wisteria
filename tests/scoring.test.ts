@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { scoreIssue, scoreRepo } from "../src/scoring.js";
-import type { IssueCandidate, RepoCandidate } from "../src/types.js";
+import { scoreIssue, scoreRepo } from "../src/github/scoring.js";
+import type { IssueCandidate, RepoCandidate } from "../src/core/types.js";
 
 function createRepo(overrides: Partial<RepoCandidate> = {}): RepoCandidate {
   return {

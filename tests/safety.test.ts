@@ -6,7 +6,7 @@ import {
   isSensitivePath,
   redactSecrets,
   sanitizePrBody,
-} from "../src/safety.js";
+} from "../src/core/safety.js";
 
 describe("safety helpers", () => {
   it("redacts token-like values", () => {

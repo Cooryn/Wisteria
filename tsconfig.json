@@ -15,5 +15,5 @@
     "exactOptionalPropertyTypes": true
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["dist", "legacy", "tests"]
+  "exclude": ["dist", "tests"]
 }

@@ -31,6 +31,7 @@ Wisteria Claw 是一个面向 OpenClaw 的原生插件，用来帮助开发者�
 .
 |-- examples/
 |   `-- openclaw/
+|       |-- openclaw.local-dev.fragment.json
 |       |-- openclaw.multi-agent.fragment.json
 |       `-- cron.jobs.json
 |-- src/
@@ -77,12 +78,101 @@ Wisteria Claw 是一个面向 OpenClaw 的原生插件，用来帮助开发者�
 openclaw plugins install clawhub:@cooryn/wisteria-claw
 ```
 
-本地开发：
+本地开发先构建：
 
 ```bash
 pnpm install
 pnpm build
 pnpm test
+```
+
+## 运行时接入
+
+这一节是最关键的。
+
+`skills/wisteria/SKILL.md`、多 Agent 配置、cron 配置，只是在告诉 OpenClaw “哪些 Agent 可以调用哪些工具”。它们不会自动把 `wisteria_*` 工具注册进运行时。
+
+真正注册工具的是插件入口 [src/index.ts](./src/index.ts) 里的 `definePluginEntry(... register(api) ...)`。所以如果你看到：
+
+- skill 已经挂上了
+- agent 配置已经写了 `wisteria_*`
+- 但运行时还是找不到这些工具
+
+问题通常不在实现缺失，而在下面三个环节之一：
+
+1. 插件没有被 OpenClaw 发现
+2. 插件没有被启用或没有重新加载
+3. 你检查的是静态列表，不是运行时注册结果
+
+### 方式一：本地开发时直接 link 这个仓库
+
+```bash
+pnpm build
+openclaw --profile wisteria-dev plugins install --link .
+openclaw --profile wisteria-dev plugins inspect wisteria-claw --runtime --json
+```
+
+说明：
+
+- `plugins install --link .` 会把当前仓库加入 `plugins.load.paths`
+- `plugins inspect ... --runtime --json` 会做一次模块加载级别的检查，比 `plugins list` 更接近真实运行时
+- 改了 `src/` 代码后，要重新 `pnpm build`
+- 改了插件代码、启用状态或 `plugins.load.paths` 后，服务中的 Gateway 还需要 `openclaw --profile wisteria-dev gateway restart`
+
+### 方式二：手动把本地仓库写进 `plugins.load.paths`
+
+仓库里提供了单独的运行时发现片段：
+
+- [examples/openclaw/openclaw.local-dev.fragment.json](./examples/openclaw/openclaw.local-dev.fragment.json)
+
+把其中的：
+
+```json
+{
+  "plugins": {
+    "load": {
+      "paths": [
+        "REPLACE_WITH_ABSOLUTE_PATH_TO_WISTERIA"
+      ]
+    }
+  }
+}
+```
+
+合并到你的 `openclaw.json`，并把占位值改成这个仓库的绝对路径。
+
+这个片段只负责“让 OpenClaw 找到插件源码/构建产物”，不包含 Agent、cron 或业务配置。
+
+### 如何确认工具已经真的注册成功
+
+先看静态发现：
+
+```bash
+openclaw --profile wisteria-dev plugins list --enabled
+```
+
+再看运行时注册：
+
+```bash
+openclaw --profile wisteria-dev plugins inspect wisteria-claw --runtime --json
+```
+
+如果运行时正常，你应该能看到这些工具名：
+
+- `wisteria_search_repos`
+- `wisteria_search_issues`
+- `wisteria_score_repo`
+- `wisteria_score_issue`
+- `wisteria_get_issue_context`
+- `wisteria_daily_issue_digest`
+- `wisteria_prepare_contribution`
+- `wisteria_check_workspace`
+- `wisteria_create_draft_pr`
+
+如果你的 profile 还是新建状态，或者命令一开始就因为本地 OpenClaw 配置不完整而失败，先运行：
+
+```bash
+openclaw --profile wisteria-dev doctor --fix
 ```
 
 ## 插件配置
@@ -93,15 +183,21 @@ pnpm test
 
 | 字段 | 必填 | 说明 |
 | --- | --- | --- |
-| `githubToken` | 是 | GitHub Personal Access Token，用于仓库检索、fork、push 和 Draft PR 创建 |
+| `githubToken` | 否 | 可选的 GitHub Personal Access Token。强烈建议配置以避免 GitHub 搜索限流；`fork`、`push` 和 Draft PR 创建必须配置 |
 | `defaultWorkDir` | 否 | 默认本地工作目录 |
 | `defaultLanguages` | 否 | 默认仓库搜索语言列表 |
 | `defaultTopics` | 否 | 默认仓库搜索 Topic 列表 |
-| `defaultLabels` | 否 | 默认 Issue 标签，默认值为 `good first issue` 和 `help wanted` |
+| `defaultLabels` | 否 | 默认 Issue 标签，默认值为 `good first issue`、`help wanted`、`beginner`、`documentation`、`bug` |
 | `minStars` | 否 | 搜索仓库时的最小 Star 数 |
 | `maxStars` | 否 | 搜索仓库时的最大 Star 数 |
 | `allowGitCommands` | 否 | 是否允许插件执行本地 Git 命令 |
 | `dailyDigest` | 否 | 每日推荐默认配置 |
+
+补充说明：
+
+- 没有 `githubToken` 时，插件仍然可以被加载和注册进运行时
+- 但 GitHub API 会更容易遇到匿名限流
+- `wisteria_prepare_contribution` 和 `wisteria_create_draft_pr` 在没有 token 时会明确返回 `GITHUB_TOKEN_REQUIRED`
 
 ### `dailyDigest` 子项
 
@@ -131,11 +227,16 @@ pnpm test
 
 仓库里已经提供了可直接参考的配置片段：
 
+- [examples/openclaw/openclaw.local-dev.fragment.json](./examples/openclaw/openclaw.local-dev.fragment.json)
 - [examples/openclaw/openclaw.multi-agent.fragment.json](./examples/openclaw/openclaw.multi-agent.fragment.json)
 - [examples/openclaw/cron.jobs.json](./examples/openclaw/cron.jobs.json)
 
-### 这两个文件各自做什么
+### 这三个文件各自做什么
 
+- `openclaw.local-dev.fragment.json`
+  - 只负责本地插件发现
+  - 对应 `plugins.load.paths`
+  - 适合“插件源码就在你本机磁盘上”的开发场景
 - `openclaw.multi-agent.fragment.json`
   - 这是要合并进 `openclaw.json` 的配置片段
   - 它包含 `plugins.entries.wisteria-claw`、`agents` 和 `cron` 三部分
@@ -145,7 +246,16 @@ pnpm test
   - 它定义了两个只读定时任务
   - 默认都使用 `delivery.mode = "none"`，不会主动向外发消息
 
-### 第一步：把插件配置合并到 OpenClaw 主配置
+### 第一步：先解决插件发现，再合并 Agent 配置
+
+如果你是在本地直接开发这个仓库，先做下面任意一种：
+
+1. 运行 `openclaw --profile wisteria-dev plugins install --link .`
+2. 或者把 [examples/openclaw/openclaw.local-dev.fragment.json](./examples/openclaw/openclaw.local-dev.fragment.json) 合并进 `openclaw.json`
+
+如果你已经从 ClawHub 或 npm 安装过发布版插件，这一步可以跳过。
+
+### 第二步：把多 Agent 片段合并到 OpenClaw 主配置
 
 把 [examples/openclaw/openclaw.multi-agent.fragment.json](./examples/openclaw/openclaw.multi-agent.fragment.json) 里的三段内容合并到你的 `openclaw.json`：
 
@@ -159,7 +269,14 @@ pnpm test
 - `defaultWorkDir`
 - `~/code/open-source` 这类工作目录
 
-### 第二步：理解 5 个角色怎么分工
+要点：
+
+- `plugins.entries.wisteria-claw` 负责启用插件和业务配置
+- `agents` 只负责权限拆分
+- `cron` 只负责定时调度
+- 如果没做前一步的“插件发现”，这里即使写了 `wisteria_*` 也不会自动出现
+
+### 第三步：理解 5 个角色怎么分工
 
 - `wisteria-orchestrator`
   - 默认 Agent
@@ -180,7 +297,7 @@ pnpm test
   - 负责检查工作区和创建 Draft PR
   - 不允许改代码
 
-### 第三步：实际使用时的建议流程
+### 第四步：实际使用时的建议流程
 
 1. 让 `wisteria-orchestrator` 接收用户需求。
 2. 由 orchestrator 把“找仓库 / 找 Issue”委派给 `wisteria-scout`。
@@ -188,7 +305,7 @@ pnpm test
 4. 用户确认要开始做时，再让 `wisteria-coder` 准备工作区并编码。
 5. 最后由 `wisteria-maintainer` 检查状态并创建 Draft PR。
 
-### 第四步：何时需要自己加 `bindings`
+### 第五步：何时需要自己加 `bindings`
 
 当前示例没有强行写死 `bindings`，因为不同人会把 OpenClaw 接到不同渠道。
 
@@ -242,6 +359,7 @@ pnpm test
 ### 如何启用这些任务
 
 1. 确保 `openclaw.json` 里启用了：
+   - 本地开发场景下，已经完成 `plugins install --link` 或 `plugins.load.paths` 配置
    - `plugins.entries.wisteria-claw.enabled = true`
    - `cron.enabled = true`
 2. 把 [examples/openclaw/cron.jobs.json](./examples/openclaw/cron.jobs.json) 复制到：

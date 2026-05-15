@@ -19,6 +19,7 @@ import { createDraftPrFromWorkspace } from "./workspace/pr.js";
 import { estimateIssueDifficulty, estimateIssueTime, scoreIssue, scoreRepo } from "./github/scoring.js";
 import { checkWorkspaceStatus, prepareContributionWorkspace } from "./workspace/workspace.js";
 import type {
+  DailyDigestParams,
   IssueCandidate,
   IssueSearchParams,
   RepoCandidate,
@@ -353,7 +354,7 @@ export default definePluginEntry({
       async execute(_toolCallId, params) {
         return executeSafely(async () => {
           const client = createGitHubClient(config.githubToken);
-          return generateDailyIssueDigest(client, config, params as RepoSearchParams);
+          return generateDailyIssueDigest(client, config, params as DailyDigestParams);
         });
       },
     });

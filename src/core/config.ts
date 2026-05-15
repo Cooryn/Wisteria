@@ -19,13 +19,11 @@ export const DEFAULT_DAILY_DIGEST = {
 export const pluginConfigJsonSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["githubToken"],
   properties: {
     githubToken: {
       type: "string",
-      minLength: 1,
       description:
-        "GitHub personal access token used for repository search, fork, branch push, and draft pull request creation.",
+        "Optional GitHub personal access token. Strongly recommended for search to avoid rate limits and required for fork, branch push, and draft pull request creation.",
     },
     defaultWorkDir: {
       type: "string",

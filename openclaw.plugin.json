@@ -9,14 +9,10 @@
   "configSchema": {
     "type": "object",
     "additionalProperties": false,
-    "required": [
-      "githubToken"
-    ],
     "properties": {
       "githubToken": {
         "type": "string",
-        "minLength": 1,
-        "description": "GitHub personal access token used for repository search, fork, branch push, and draft pull request creation."
+        "description": "Optional GitHub personal access token. Strongly recommended for search to avoid rate limits and required for fork, branch push, and draft pull request creation."
       },
       "defaultWorkDir": {
         "type": "string",
@@ -43,7 +39,10 @@
         },
         "default": [
           "good first issue",
-          "help wanted"
+          "help wanted",
+          "beginner",
+          "documentation",
+          "bug"
         ],
         "description": "Default issue labels used for issue discovery."
       },

@@ -2,6 +2,8 @@
 
 Use this skill when the user wants help finding open-source contribution opportunities, analyzing GitHub issues, preparing a contribution branch, coordinating a multi-agent contribution workflow, or creating a draft pull request.
 
+Prerequisite: this skill only works after the `wisteria-claw` plugin is installed or linked into the OpenClaw runtime. Agent config or skill files alone do not register the `wisteria_*` tools.
+
 ## Core Workflow
 
 1. Ask for or infer user preferences:

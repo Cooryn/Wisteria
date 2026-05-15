@@ -30,6 +30,16 @@ const multiAgentExample = JSON.parse(
   };
 };
 
+const localDevExample = JSON.parse(
+  readFileSync(new URL("../examples/openclaw/openclaw.local-dev.fragment.json", import.meta.url), "utf8"),
+) as {
+  plugins: {
+    load: {
+      paths: string[];
+    };
+  };
+};
+
 const cronStoreExample = JSON.parse(
   readFileSync(new URL("../examples/openclaw/cron.jobs.json", import.meta.url), "utf8"),
 ) as {
@@ -54,6 +64,12 @@ function agentById(id: string) {
 }
 
 describe("example configuration files", () => {
+  it("keeps the local-dev example on explicit plugin discovery paths", () => {
+    expect(localDevExample.plugins.load.paths).toEqual([
+      "REPLACE_WITH_ABSOLUTE_PATH_TO_WISTERIA",
+    ]);
+  });
+
   it("keeps the multi-agent example wired to the plugin", () => {
     expect(multiAgentExample.plugins.entries["wisteria-claw"]?.enabled).toBe(true);
     expect(multiAgentExample.cron.enabled).toBe(true);

@@ -175,6 +175,38 @@ openclaw --profile wisteria-dev plugins inspect wisteria-claw --runtime --json
 openclaw --profile wisteria-dev doctor --fix
 ```
 
+## Troubleshooting: Skill tries to load missing `.mjs` files
+
+If OpenClaw reports missing files such as:
+
+```text
+skills/wisteria/tools/wisteria-search.mjs
+skills/wisteria/tools/wisteria-scoring.mjs
+```
+
+you are using an old Skill configuration that expects local Skill tool scripts.
+
+Wisteria Claw does not use local Skill `.mjs` tools.
+
+Fix:
+
+1. Remove references to `skills/wisteria/tools/*.mjs` from `skills/wisteria/SKILL.md` and related config files.
+2. Ensure `openclaw.plugin.json` contains `"skills": ["skills"]`.
+3. Ensure `src/index.ts` registers all `wisteria_*` tools.
+4. Run:
+
+```bash
+pnpm build
+openclaw plugins install . --force
+openclaw gateway restart
+```
+
+5. Verify tools:
+
+```bash
+openclaw plugins inspect wisteria-claw --json
+```
+
 ## 插件配置
 
 插件清单和 schema 在 [openclaw.plugin.json](./openclaw.plugin.json)。

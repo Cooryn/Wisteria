@@ -104,6 +104,7 @@ export const recommendedAgents: Record<
       "sessions_list",
       "sessions_history",
       "wisteria_get_preferences",
+      "wisteria_update_preferences",
     ],
     deny: [],
     readOnly: true,

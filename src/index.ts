@@ -6,13 +6,17 @@ import {
 } from "openclaw/plugin-sdk/core";
 
 import {
+  applyPreferencesPatch,
+  ensurePluginConfigEntry,
+  getPluginConfigEntry,
   pluginConfigJsonSchema,
   pluginConfigUiHints,
   resolveConfig,
+  toPreferencesResult,
   withRepoSearchDefaults,
 } from "./core/config.js";
 import { generateDailyIssueDigest } from "./github/daily-digest.js";
-import { toToolError } from "./core/errors.js";
+import { toToolError, WisteriaError } from "./core/errors.js";
 import { createGitHubClient, searchRepositories } from "./github/client.js";
 import { getIssueContext, searchIssues } from "./github/issues.js";
 import { createDraftPrFromWorkspace } from "./workspace/pr.js";
@@ -22,7 +26,9 @@ import type {
   DailyDigestParams,
   IssueCandidate,
   IssueSearchParams,
+  WisteriaPreferencesPatch,
   WisteriaPreferencesResult,
+  WisteriaPreferencesUpdateResult,
   RepoCandidate,
   RepoSearchParams,
   ToolResult,
@@ -30,6 +36,7 @@ import type {
 
 export const wisteriaToolNames = [
   "wisteria_get_preferences",
+  "wisteria_update_preferences",
   "wisteria_search_repos",
   "wisteria_search_issues",
   "wisteria_score_repo",
@@ -66,6 +73,33 @@ const repoSearchSchema = Type.Object(
 );
 
 const getPreferencesSchema = Type.Object({}, { additionalProperties: false });
+
+const updateDailyDigestPreferencesSchema = Type.Object(
+  {
+    enabled: Type.Optional(Type.Union([Type.Boolean(), Type.Null()])),
+    timezone: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+    hour: Type.Optional(Type.Union([Type.Number({ minimum: 0, maximum: 23 }), Type.Null()])),
+    limit: Type.Optional(Type.Union([Type.Number({ minimum: 1, maximum: 20 }), Type.Null()])),
+    minScore: Type.Optional(Type.Union([Type.Number({ minimum: 0, maximum: 100 }), Type.Null()])),
+  },
+  { additionalProperties: false },
+);
+
+const updatePreferencesSchema = Type.Object(
+  {
+    defaultWorkDir: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+    defaultLanguages: Type.Optional(Type.Union([Type.Array(Type.String()), Type.Null()])),
+    defaultTopics: Type.Optional(Type.Union([Type.Array(Type.String()), Type.Null()])),
+    defaultLabels: Type.Optional(Type.Union([Type.Array(Type.String()), Type.Null()])),
+    minStars: Type.Optional(Type.Union([Type.Number({ minimum: 0 }), Type.Null()])),
+    maxStars: Type.Optional(Type.Union([Type.Number({ minimum: 0 }), Type.Null()])),
+    allowGitCommands: Type.Optional(Type.Union([Type.Boolean(), Type.Null()])),
+    dailyDigest: Type.Optional(
+      Type.Union([updateDailyDigestPreferencesSchema, Type.Null()]),
+    ),
+  },
+  { additionalProperties: false },
+);
 
 const issueSearchSchema = Type.Object(
   {
@@ -188,7 +222,8 @@ export default definePluginEntry({
     uiHints: pluginConfigUiHints,
   }),
   register(api) {
-    const config = resolveConfig(api.pluginConfig);
+    const getConfig = () =>
+      resolveConfig(getPluginConfigEntry(api.runtime.config.current(), api.id) ?? api.pluginConfig);
 
     api.registerToolMetadata({
       toolName: "wisteria_prepare_contribution",
@@ -208,6 +243,12 @@ export default definePluginEntry({
       risk: "high",
       tags: ["git", "github", "draft-pr"],
     });
+    api.registerToolMetadata({
+      toolName: "wisteria_update_preferences",
+      displayName: "Wisteria Update Preferences",
+      risk: "medium",
+      tags: ["config", "preferences"],
+    });
 
     api.registerTool({
       name: "wisteria_get_preferences",
@@ -217,26 +258,49 @@ export default definePluginEntry({
       parameters: getPreferencesSchema,
       async execute() {
         return executeSafely(async () => {
-          const preferences: WisteriaPreferencesResult = {
-            source: "plugin-config",
-            hasGitHubToken: config.githubToken.trim().length > 0,
-            allowGitCommands: config.allowGitCommands ?? false,
-            defaultWorkDir: config.defaultWorkDir ?? null,
-            defaultLanguages: [...(config.defaultLanguages ?? [])],
-            defaultTopics: [...(config.defaultTopics ?? [])],
-            defaultLabels: [...(config.defaultLabels ?? [])],
-            minStars: config.minStars ?? null,
-            maxStars: config.maxStars ?? null,
-            dailyDigest: {
-              enabled: config.dailyDigest?.enabled ?? false,
-              timezone: config.dailyDigest?.timezone ?? "Asia/Tokyo",
-              hour: config.dailyDigest?.hour ?? 9,
-              limit: config.dailyDigest?.limit ?? 5,
-              minScore: config.dailyDigest?.minScore ?? 60,
+          const preferences: WisteriaPreferencesResult = toPreferencesResult(getConfig());
+          return preferences;
+        });
+      },
+    });
+
+    api.registerTool({
+      name: "wisteria_update_preferences",
+      label: "Wisteria Update Preferences",
+      description:
+        "Persist non-secret Wisteria preferences such as languages, topics, labels, work directory, and daily digest defaults.",
+      parameters: updatePreferencesSchema,
+      async execute(_toolCallId, params) {
+        return executeSafely(async () => {
+          const patch = params as WisteriaPreferencesPatch;
+          let changedFields: string[] = [];
+          let warnings: string[] = [];
+
+          await api.runtime.config.mutateConfigFile({
+            afterWrite: { mode: "auto" },
+            mutate(draft) {
+              if (draft === null || typeof draft !== "object") {
+                throw new WisteriaError("Invalid runtime config draft.", "INVALID_CONFIG");
+              }
+
+              const pluginConfig = ensurePluginConfigEntry(
+                draft as Record<string, unknown>,
+                api.id,
+              );
+              const result = applyPreferencesPatch(pluginConfig, patch);
+              changedFields = result.changedFields;
+              warnings = result.warnings;
             },
+          });
+
+          const updateResult: WisteriaPreferencesUpdateResult = {
+            updated: changedFields.length > 0,
+            changedFields,
+            warnings,
+            preferences: toPreferencesResult(getConfig()),
           };
 
-          return preferences;
+          return updateResult;
         });
       },
     });
@@ -248,6 +312,7 @@ export default definePluginEntry({
       parameters: repoSearchSchema,
       async execute(_toolCallId, params) {
         return executeSafely(async () => {
+          const config = getConfig();
           const client = createGitHubClient(config.githubToken);
           const effective = withRepoSearchDefaults(config, params as RepoSearchParams);
           const result = await searchRepositories(client, effective);
@@ -263,6 +328,7 @@ export default definePluginEntry({
       parameters: issueSearchSchema,
       async execute(_toolCallId, params) {
         return executeSafely(async () => {
+          const config = getConfig();
           const client = createGitHubClient(config.githubToken);
           const result = await searchIssues(client, params as IssueSearchParams);
           return { issues: result.issues };
@@ -371,6 +437,7 @@ export default definePluginEntry({
       parameters: issueContextSchema,
       async execute(_toolCallId, params) {
         return executeSafely(async () => {
+          const config = getConfig();
           const client = createGitHubClient(config.githubToken);
           return getIssueContext(client, params as {
             repoFullName: string;
@@ -389,6 +456,7 @@ export default definePluginEntry({
       parameters: dailyDigestSchema,
       async execute(_toolCallId, params) {
         return executeSafely(async () => {
+          const config = getConfig();
           const client = createGitHubClient(config.githubToken);
           return generateDailyIssueDigest(client, config, params as DailyDigestParams);
         });
@@ -412,7 +480,7 @@ export default definePluginEntry({
                 branchName: string;
                 forkIfNeeded?: boolean;
               },
-              config,
+              getConfig(),
             ),
           );
         },
@@ -430,7 +498,7 @@ export default definePluginEntry({
           return executeSafely(async () =>
             checkWorkspaceStatus(
               (params as { workspacePath: string }).workspacePath,
-              config,
+              getConfig(),
             ),
           );
         },
@@ -455,7 +523,7 @@ export default definePluginEntry({
                 body: string;
                 baseBranch?: string;
               },
-              config,
+              getConfig(),
             ),
           );
         },

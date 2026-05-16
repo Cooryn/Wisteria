@@ -42,6 +42,21 @@ const localDevExample = JSON.parse(
   };
 };
 
+const localReadyExample = JSON.parse(
+  readFileSync(new URL("../examples/openclaw/openclaw.local-ready.json", import.meta.url), "utf8"),
+) as {
+  plugins: {
+    load?: {
+      paths?: string[];
+    };
+    entries: Record<string, { enabled: boolean; config?: Record<string, unknown> }>;
+  };
+  cron: {
+    enabled: boolean;
+    store: string;
+  };
+};
+
 const cronStoreExample = JSON.parse(
   readFileSync(new URL("../examples/openclaw/cron.jobs.json", import.meta.url), "utf8"),
 ) as {
@@ -70,6 +85,13 @@ describe("example configuration files", () => {
     expect(localDevExample.plugins.load.paths).toEqual([
       "REPLACE_WITH_ABSOLUTE_PATH_TO_WISTERIA",
     ]);
+  });
+
+  it("keeps the local-ready example self-contained on a single file path", () => {
+    expect(localReadyExample.plugins.entries["wisteria-claw"]?.enabled).toBe(true);
+    expect(localReadyExample.plugins.load?.paths?.length).toBe(1);
+    expect(localReadyExample.cron.enabled).toBe(true);
+    expect(localReadyExample.cron.store).toContain("jobs.json");
   });
 
   it("keeps the multi-agent example wired to the plugin", () => {

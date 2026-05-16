@@ -35,6 +35,32 @@ export interface WisteriaPreferencesResult {
   };
 }
 
+export interface WisteriaDailyDigestPreferencesPatch {
+  enabled?: boolean | null;
+  timezone?: string | null;
+  hour?: number | null;
+  limit?: number | null;
+  minScore?: number | null;
+}
+
+export interface WisteriaPreferencesPatch {
+  defaultWorkDir?: string | null;
+  defaultLanguages?: string[] | null;
+  defaultTopics?: string[] | null;
+  defaultLabels?: string[] | null;
+  minStars?: number | null;
+  maxStars?: number | null;
+  allowGitCommands?: boolean | null;
+  dailyDigest?: WisteriaDailyDigestPreferencesPatch | null;
+}
+
+export interface WisteriaPreferencesUpdateResult {
+  updated: boolean;
+  changedFields: string[];
+  warnings: string[];
+  preferences: WisteriaPreferencesResult;
+}
+
 export interface RepoScoreBreakdown {
   languageMatch: number;
   topicMatch: number;

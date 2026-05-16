@@ -59,6 +59,14 @@ describe("recommendedAgents", () => {
     expect(recommendedAgents.maintainer.alsoAllow).toContain("wisteria_get_preferences");
   });
 
+  it("only lets the orchestrator update saved runtime preferences", () => {
+    expect(recommendedAgents.orchestrator.alsoAllow).toContain("wisteria_update_preferences");
+    expect(recommendedAgents.scout.alsoAllow).not.toContain("wisteria_update_preferences");
+    expect(recommendedAgents.analyst.alsoAllow).not.toContain("wisteria_update_preferences");
+    expect(recommendedAgents.coder.alsoAllow).not.toContain("wisteria_update_preferences");
+    expect(recommendedAgents.maintainer.alsoAllow).not.toContain("wisteria_update_preferences");
+  });
+
   it("keeps the orchestrator on delegation-only workflow tools", () => {
     expect(recommendedAgents.orchestrator.alsoAllow).not.toContain("wisteria_search_repos");
     expect(recommendedAgents.orchestrator.alsoAllow).not.toContain("wisteria_search_issues");
@@ -105,6 +113,7 @@ describe("recommendedAgents", () => {
         "read",
         "sessions_spawn",
         "wisteria_get_preferences",
+        "wisteria_update_preferences",
       ]),
     );
   });

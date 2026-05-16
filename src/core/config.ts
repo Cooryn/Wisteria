@@ -1,4 +1,10 @@
-import type { DailyDigestParams, RepoSearchParams, WisteriaConfig } from "./types.js";
+import type {
+  DailyDigestParams,
+  RepoSearchParams,
+  WisteriaConfig,
+  WisteriaPreferencesPatch,
+  WisteriaPreferencesResult,
+} from "./types.js";
 
 export const DEFAULT_ISSUE_LABELS = [
   "good first issue",
@@ -92,6 +98,14 @@ export const pluginConfigUiHints = {
   },
 } as const;
 
+function isRecord(input: unknown): input is Record<string, unknown> {
+  return input !== null && typeof input === "object";
+}
+
+function hasOwn(target: Record<string, unknown>, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(target, key);
+}
+
 function normalizeStringList(input: unknown): string[] | undefined {
   if (!Array.isArray(input)) {
     return undefined;
@@ -126,6 +140,138 @@ function readOptionalNumber(input: unknown): number | undefined {
 
 function readOptionalBoolean(input: unknown): boolean | undefined {
   return typeof input === "boolean" ? input : undefined;
+}
+
+function ensureNestedRecord(
+  parent: Record<string, unknown>,
+  key: string,
+): Record<string, unknown> {
+  if (!isRecord(parent[key])) {
+    parent[key] = {};
+  }
+
+  return parent[key] as Record<string, unknown>;
+}
+
+function normalizePreferenceList(input: string[] | null | undefined): string[] | null {
+  if (input === null) {
+    return null;
+  }
+
+  if (!Array.isArray(input)) {
+    return null;
+  }
+
+  const normalized = [...new Set(
+    input
+      .map((value) => value.trim())
+      .filter(Boolean),
+  )];
+
+  return normalized.length > 0 ? normalized : null;
+}
+
+function updateOptionalStringField(
+  target: Record<string, unknown>,
+  key: string,
+  value: string | null | undefined,
+  changedFields: string[],
+) {
+  if (value === undefined) {
+    return;
+  }
+
+  const nextValue = typeof value === "string" ? value.trim() : "";
+  if (!nextValue) {
+    if (hasOwn(target, key)) {
+      delete target[key];
+      changedFields.push(key);
+    }
+    return;
+  }
+
+  if (target[key] !== nextValue) {
+    target[key] = nextValue;
+    changedFields.push(key);
+  }
+}
+
+function updateOptionalListField(
+  target: Record<string, unknown>,
+  key: string,
+  value: string[] | null | undefined,
+  changedFields: string[],
+) {
+  if (value === undefined) {
+    return;
+  }
+
+  const nextValue = normalizePreferenceList(value);
+  if (!nextValue) {
+    if (hasOwn(target, key)) {
+      delete target[key];
+      changedFields.push(key);
+    }
+    return;
+  }
+
+  const currentValue = normalizeStringList(target[key]);
+  if (
+    !currentValue ||
+    currentValue.length !== nextValue.length ||
+    currentValue.some((entry, index) => entry !== nextValue[index])
+  ) {
+    target[key] = nextValue;
+    changedFields.push(key);
+  }
+}
+
+function updateOptionalNumberField(
+  target: Record<string, unknown>,
+  key: string,
+  value: number | null | undefined,
+  changedFields: string[],
+) {
+  if (value === undefined) {
+    return;
+  }
+
+  if (value === null) {
+    if (hasOwn(target, key)) {
+      delete target[key];
+      changedFields.push(key);
+    }
+    return;
+  }
+
+  if (target[key] !== value) {
+    target[key] = value;
+    changedFields.push(key);
+  }
+}
+
+function updateOptionalBooleanField(
+  target: Record<string, unknown>,
+  key: string,
+  value: boolean | null | undefined,
+  changedFields: string[],
+) {
+  if (value === undefined) {
+    return;
+  }
+
+  if (value === null) {
+    if (hasOwn(target, key)) {
+      delete target[key];
+      changedFields.push(key);
+    }
+    return;
+  }
+
+  if (target[key] !== value) {
+    target[key] = value;
+    changedFields.push(key);
+  }
 }
 
 export function resolveConfig(raw: unknown): WisteriaConfig {
@@ -182,6 +328,155 @@ export function resolveConfig(raw: unknown): WisteriaConfig {
   }
 
   return config;
+}
+
+export function getPluginConfigEntry(
+  rawConfig: unknown,
+  pluginId: string,
+): Record<string, unknown> | undefined {
+  if (!isRecord(rawConfig)) {
+    return undefined;
+  }
+
+  const plugins = rawConfig.plugins;
+  if (!isRecord(plugins)) {
+    return undefined;
+  }
+
+  const entries = plugins.entries;
+  if (!isRecord(entries)) {
+    return undefined;
+  }
+
+  const pluginEntry = entries[pluginId];
+  if (!isRecord(pluginEntry)) {
+    return undefined;
+  }
+
+  const pluginConfig = pluginEntry.config;
+  return isRecord(pluginConfig) ? pluginConfig : undefined;
+}
+
+export function ensurePluginConfigEntry(
+  rawConfig: Record<string, unknown>,
+  pluginId: string,
+): Record<string, unknown> {
+  const plugins = ensureNestedRecord(rawConfig, "plugins");
+  const entries = ensureNestedRecord(plugins, "entries");
+  const pluginEntry = ensureNestedRecord(entries, pluginId);
+  return ensureNestedRecord(pluginEntry, "config");
+}
+
+export function toPreferencesResult(config: WisteriaConfig): WisteriaPreferencesResult {
+  return {
+    source: "plugin-config",
+    hasGitHubToken: config.githubToken.trim().length > 0,
+    allowGitCommands: config.allowGitCommands ?? false,
+    defaultWorkDir: config.defaultWorkDir ?? null,
+    defaultLanguages: [...(config.defaultLanguages ?? [])],
+    defaultTopics: [...(config.defaultTopics ?? [])],
+    defaultLabels: [...(config.defaultLabels ?? [])],
+    minStars: config.minStars ?? null,
+    maxStars: config.maxStars ?? null,
+    dailyDigest: {
+      enabled: config.dailyDigest?.enabled ?? false,
+      timezone: config.dailyDigest?.timezone ?? "Asia/Tokyo",
+      hour: config.dailyDigest?.hour ?? 9,
+      limit: config.dailyDigest?.limit ?? 5,
+      minScore: config.dailyDigest?.minScore ?? 60,
+    },
+  };
+}
+
+export function applyPreferencesPatch(
+  rawConfig: Record<string, unknown>,
+  patch: WisteriaPreferencesPatch,
+): {
+  changedFields: string[];
+  warnings: string[];
+} {
+  const changedFields: string[] = [];
+  const warnings: string[] = [];
+
+  updateOptionalStringField(rawConfig, "defaultWorkDir", patch.defaultWorkDir, changedFields);
+  updateOptionalListField(rawConfig, "defaultLanguages", patch.defaultLanguages, changedFields);
+  updateOptionalListField(rawConfig, "defaultTopics", patch.defaultTopics, changedFields);
+  updateOptionalListField(rawConfig, "defaultLabels", patch.defaultLabels, changedFields);
+  updateOptionalNumberField(rawConfig, "minStars", patch.minStars, changedFields);
+  updateOptionalNumberField(rawConfig, "maxStars", patch.maxStars, changedFields);
+  updateOptionalBooleanField(
+    rawConfig,
+    "allowGitCommands",
+    patch.allowGitCommands,
+    changedFields,
+  );
+
+  if (patch.dailyDigest !== undefined) {
+    if (patch.dailyDigest === null) {
+      if (hasOwn(rawConfig, "dailyDigest")) {
+        delete rawConfig.dailyDigest;
+        changedFields.push("dailyDigest");
+      }
+    } else {
+      const dailyDigest = ensureNestedRecord(rawConfig, "dailyDigest");
+      updateOptionalBooleanField(
+        dailyDigest,
+        "enabled",
+        patch.dailyDigest.enabled,
+        changedFields,
+      );
+      updateOptionalStringField(
+        dailyDigest,
+        "timezone",
+        patch.dailyDigest.timezone,
+        changedFields,
+      );
+      updateOptionalNumberField(
+        dailyDigest,
+        "hour",
+        patch.dailyDigest.hour,
+        changedFields,
+      );
+      updateOptionalNumberField(
+        dailyDigest,
+        "limit",
+        patch.dailyDigest.limit,
+        changedFields,
+      );
+      updateOptionalNumberField(
+        dailyDigest,
+        "minScore",
+        patch.dailyDigest.minScore,
+        changedFields,
+      );
+
+      if (Object.keys(dailyDigest).length === 0) {
+        delete rawConfig.dailyDigest;
+      }
+
+      for (const field of ["enabled", "timezone", "hour", "limit", "minScore"]) {
+        const index = changedFields.indexOf(field);
+        if (index >= 0) {
+          changedFields[index] = `dailyDigest.${field}`;
+        }
+      }
+    }
+  }
+
+  const minStars = readOptionalNumber(rawConfig.minStars);
+  const maxStars = readOptionalNumber(rawConfig.maxStars);
+  if (minStars !== undefined && maxStars !== undefined && maxStars < minStars) {
+    rawConfig.maxStars = minStars;
+    if (!changedFields.includes("maxStars")) {
+      changedFields.push("maxStars");
+    }
+    warnings.push("maxStars was raised to match minStars.");
+  }
+
+  return {
+    changedFields: [...new Set(changedFields)],
+    warnings,
+  };
 }
 
 export function withRepoSearchDefaults(

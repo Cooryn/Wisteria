@@ -1,116 +1,84 @@
-# Wisteria — 开源贡献助手 开发总结
+# Wisteria Claw
 
-## 项目概述
+Wisteria Claw 是一个面向 OpenClaw 的原生插件，用来把 GitHub 开源贡献流程拆成一组可组合的工具：发现仓库、筛选 issue、读取上下文、准备本地工作区、检查状态，以及创建 Draft PR。
 
-Wisteria 是一个桌面应用，帮助开发者根据自身技术栈偏好，自动搜索 GitHub 开源项目、寻找合适的 Issue、并支持一键生成 Draft PR。
+这个仓库包含插件实现、Skill、示例配置和测试，不再包含旧的独立桌面端逻辑。它适合被 OpenClaw Agent 作为开源贡献工作流插件直接使用。
 
-## 技术栈
+## 功能概览
 
-| 层级 | 技术 | 版本 |
-|------|------|------|
-| 桌面框架 | Tauri 2 | `2.10.x` |
-| 前端框架 | React + TypeScript | `19.x` / `5.8` |
-| UI 库 | Material UI | `6.5.0` |
-| 状态管理 | Zustand | `5.x` |
-| GitHub API | Octokit | `22.x` |
-| 本地数据库 | SQLite (via tauri-plugin-sql) | `2.4.0` |
-| Git 操作 | 系统 git (via tauri-plugin-shell) | `2.3.5` |
-| LLM | OpenAI 兼容 API | — |
-| 包管理器 | pnpm | `9.x` |
+- 按语言、Topic、Star 区间发现 GitHub 仓库
+- 搜索并筛选更适合上手贡献的 issue
+- 对仓库和 issue 做确定性评分
+- 拉取 issue、评论和 README 等结构化上下文
+- 生成只读的每日 issue 推荐
+- 准备和检查本地贡献工作区
+- 只创建 GitHub Draft PR，不创建正式 PR
+- 支持多 Agent 分工和 cron 任务
 
-## 项目架构
+## 工具范围
 
-```
-Wisteria/
-├── src/                          # React 前端
-│   ├── main.tsx                  # 入口
-│   ├── App.tsx                   # 根组件 (路由 + 布局 + Snackbar)
-│   ├── theme/index.ts            # MUI 主题 (深色/浅色双主题)
-│   ├── types/index.ts            # TypeScript 类型定义
-│   ├── store/index.ts            # Zustand 全局状态
-│   ├── components/
-│   │   ├── ThemeProvider.tsx      # 深色/浅色/跟随系统主题切换
-│   │   ├── Layout/
-│   │   │   ├── Sidebar.tsx       # 可收放侧边导航
-│   │   │   └── TopBar.tsx        # 顶栏 (标题+主题切换)
-│   │   ├── RepoCard.tsx          # 仓库卡片
-│   │   ├── IssueCard.tsx         # Issue 卡片
-│   │   └── ScoreBadge.tsx        # 分数徽章 (conic-gradient)
-│   ├── pages/
-│   │   ├── Dashboard.tsx         # 仪表盘 (统计+推荐)
-│   │   ├── Explorer.tsx          # 探索页 (搜索+双栏)
-│   │   ├── Preferences.tsx       # 偏好设置
-│   │   ├── IssueDetail.tsx       # Issue 详情 + AI 分析
-│   │   └── Settings.tsx          # 应用设置
-│   └── services/
-│       ├── database.ts           # SQLite CRUD
-│       ├── github.ts             # Octokit 封装
-│       ├── scorer.ts             # 打分引擎
-│       ├── git.ts                # Git CLI 封装
-│       └── llm.ts                # OpenAI API 封装
-├── src-tauri/
-│   ├── src/lib.rs                # Rust 入口 (插件注册+迁移)
-│   ├── capabilities/default.json # 权限配置
-│   ├── tauri.conf.json           # 应用配置
-│   └── Cargo.toml                # Rust 依赖
-└── index.html                    # HTML 入口 (Inter 字体)
-```
+当前插件注册 11 个 `wisteria_*` 工具，分为两组：
 
-## 核心功能
+- 发现与分析：`wisteria_get_preferences`、`wisteria_update_preferences`、`wisteria_search_repos`、`wisteria_search_issues`、`wisteria_score_repo`、`wisteria_score_issue`、`wisteria_get_issue_context`、`wisteria_daily_issue_digest`
+- 工作区与发布：`wisteria_prepare_contribution`、`wisteria_check_workspace`、`wisteria_create_draft_pr`
 
-### 1. 偏好管理
-- 编程语言 / 框架 / 工具标签管理，每个标签可调权重
-- 星标范围滑块
-- Issue 标签偏好 (good first issue, help wanted 等)
-- 自定义工作目录
+## 架构解析
 
-### 2. 智能搜索 + 打分
-6 维度加权打分系统：
-- 语言匹配 (30%) — 仓库主语言是否在偏好中
-- 技术栈匹配 (25%) — topics/描述与标签交集
-- 活跃度 (15%) — 最近更新时间
-- 社区 (10%) — 星标数在偏好范围内
-- Issue 友好度 (10%) — 开放 Issue 数量
-- 新鲜度 (10%) — 仓库年龄
+这个插件采用比较直接的分层结构：
 
-### 3. Issue 分析
-- Markdown 渲染 Issue 正文
-- LLM (OpenAI) 智能分析：难度评估、时间预估、建议方向、涉及文件
+- `openclaw.plugin.json` 定义插件元数据、配置模式和对外工具契约
+- `src/index.ts` 是运行时入口，负责注册工具、声明参数 Schema、标记风险等级，并把每个工具路由到对应的领域模块
+- `src/core/` 负责配置解析、偏好更新、类型定义、错误封装和安全约束，是各层共用的基础设施
+- `src/github/` 负责 GitHub 查询、仓库与 issue 评分、issue 上下文拼装和每日 digest 生成
+- `src/workspace/` 负责本地副作用操作，包括 fork/clone、remote 校正、分支准备、工作区检查和 Draft PR 创建
 
-### 4. Draft PR 流程 (预留)
-- Fork 仓库 → Clone → 创建分支 → 提交 → 推送 → 创建 Draft PR
-- 通过 Octokit API 和系统 git 命令实现
+运行时数据流也比较清晰：
 
-### 5. 主题系统
-- 深色 / 浅色 / 跟随系统 三态切换
-- 紫藤品牌色：Primary #7C4DFF, Secondary #00E5FF
-- 玻璃拟态卡片、渐变按钮、conic-gradient 分数徽章
+- Agent 调用某个 `wisteria_*` 工具后，先由 `src/index.ts` 的 Schema 做参数校验
+- 工具执行前会读取当前运行时配置，而不是只依赖插件启动时的静态快照
+- 只读类工具把请求转发到 `src/github/`，副作用类工具转发到 `src/workspace/`
+- 所有结果最终都通过统一的结构化 JSON 返回，错误也会被包装成一致的工具错误格式
 
-## 数据库设计
+有一个值得注意的设计点：
 
-6 张表：`preferences`, `tech_tags`, `saved_repos`, `saved_issues`, `app_settings`, `pr_history`
-- 通过 Rust 侧 `tauri-plugin-sql` 的 Migration 机制自动建表
-- 所有数据存储在本地 SQLite，零网络传输
+- `wisteria_update_preferences` 会直接写回运行时配置文件
+- 其他工具通过 `getConfig()` 每次重新解析配置，所以偏好修改会立刻影响后续搜索、digest 和工作区相关操作
+- 安全边界不散落在文档里，而是集中在 `src/core/safety.ts` 和工具元数据里控制高风险动作
 
-## 验证结果
+## 仓库结构
 
-- ✅ TypeScript 编译 — 零错误
-- ✅ Rust 编译 — 成功
-- ✅ `pnpm tauri dev` — 应用启动成功
-
-## 运行方式
-
-```bash
-cd Wisteria
-pnpm install
-pnpm tauri dev
+```text
+.
+|-- examples/
+|   `-- openclaw/
+|       |-- agent-workspaces/
+|       |-- openclaw.local-dev.fragment.json
+|       |-- openclaw.local-ready.json
+|       |-- openclaw.multi-agent.fragment.json
+|       `-- cron.jobs.json
+|-- skills/
+|   `-- wisteria/
+|       `-- SKILL.md
+|-- src/
+|-- tests/
+|-- openclaw.plugin.json
+|-- package.json
+`-- tsconfig.json
 ```
 
-## 使用指南
+- `src/`：插件源码，包含配置、GitHub 查询、评分、工作区和工具注册逻辑
+- `skills/wisteria/`：给 OpenClaw Agent 使用的 Skill 说明
+- `examples/openclaw/`：本地开发、多 Agent 和 cron 的示例配置
+- `tests/`：回归测试
 
-1. 打开应用 → 前往「设置」页配置 GitHub Token
-2. 前往「偏好设置」添加你的技术栈标签
-3. 回到「仪表盘」查看推荐项目
-4. 或前往「探索」页搜索指定项目
-5. 点击仓库查看 Issue 列表
-6. 点击 Issue 查看详情，使用 AI 分析功能
+## 相关文件
+
+- 插件清单：[openclaw.plugin.json](./openclaw.plugin.json)
+- Skill 说明：[skills/wisteria/SKILL.md](./skills/wisteria/SKILL.md)
+- 多 Agent 示例：[examples/openclaw/openclaw.multi-agent.fragment.json](./examples/openclaw/openclaw.multi-agent.fragment.json)
+- 本地完整示例：[examples/openclaw/openclaw.local-ready.json](./examples/openclaw/openclaw.local-ready.json)
+- cron 示例：[examples/openclaw/cron.jobs.json](./examples/openclaw/cron.jobs.json)
+
+## 许可证
+
+本项目使用 [LICENSE](./LICENSE) 中定义的 MIT License。

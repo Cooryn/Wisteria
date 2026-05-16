@@ -1,0 +1,9 @@
+{
+  "plugins": {
+    "load": {
+      "paths": [
+        "REPLACE_WITH_ABSOLUTE_PATH_TO_WISTERIA"
+      ]
+    }
+  }
+}
